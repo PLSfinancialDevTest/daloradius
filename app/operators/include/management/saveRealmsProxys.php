@@ -38,6 +38,7 @@ if ($fileFlag == 1) {
     // check if the file has daloradius signature
     // $dalo_signature = fgets($realmsFd, 12);
     $dalo_signature = fread($origFd, 12);
+    fclose($origFd);
 
     if (strcmp($dalo_signature, "# daloradius") !== 0) {
         

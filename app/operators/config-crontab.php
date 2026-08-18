@@ -116,11 +116,11 @@ EOF;
                     
                     $result = file_put_contents($dalo_crontab_file, $contents);
                     if ($result > 0) {
-                        $exec1 = sprintf("%s -r", $crontab_bin);
+                        $exec1 = sprintf("%s -r", escapeshellarg($crontab_bin));
 
                         $result1 = exec($exec1, $output1, $result_code1);
                         if ($result1 !== false) {
-                            $exec2 = sprintf("%s %s", $crontab_bin, $dalo_crontab_file);
+                            $exec2 = sprintf("%s %s", escapeshellarg($crontab_bin), escapeshellarg($dalo_crontab_file));
                             $result2 = exec($exec2, $output2, $result_code2);
 
                             if ($result2 === false) {

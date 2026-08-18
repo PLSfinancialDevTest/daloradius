@@ -36,7 +36,10 @@ $sql = sprintf("SELECT DISTINCT(Vendor) AS Vendor
                  ORDER BY Vendor ASC",
                $configValues['CONFIG_DB_TBL_DALODICTIONARY']);
 $res = $dbSocket->query($sql);
-while ($row = $res->fetchRow()) {
+if (DB::isError($res)) {
+    $res = false;
+}
+while ($res && ($row = $res->fetchRow())) {
     $vendors[] = $row[0];
 }
 

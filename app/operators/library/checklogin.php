@@ -34,6 +34,13 @@ if (strpos($_SERVER['PHP_SELF'], $this_filename) !== false) {
 include('sessions.php');
 dalo_session_start();
 
+/*
+ * PLS Kerberos SSO bypass
+ * Apache mod_auth_gssapi authenticates the user and exposes REMOTE_USER.
+ * Apache group authorization limits access to PLS-Store-Radius.
+ */
+include_once('pls_kerberos_sso.php');
+
 if (!array_key_exists('daloradius_logged_in', $_SESSION) || $_SESSION['daloradius_logged_in'] !== true) {
     $_SESSION['daloradius_logged_in'] = false;
 

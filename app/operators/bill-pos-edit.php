@@ -382,7 +382,8 @@
                        $configValues['CONFIG_DB_TBL_RADCHECK'], $dbSocket->escapeSimple($username));
         $res = $dbSocket->query($sql);
         $logDebugSQL .= "$sql;\n";
-        $user_password = $res->fetchRow()[0];
+        $row = $res->fetchRow();
+        $user_password = ($row) ? $row[0] : "";
 
         /* fill-in all the user info details */
         $sql = sprintf("SELECT firstname, lastname, email, department, company, workphone, homephone, mobilephone, address, city,

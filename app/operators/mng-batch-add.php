@@ -103,7 +103,8 @@
 
         // if the INSERT to the batch_history table was succesful and there exist
         // only 1 record (meaning, we don't have a duplicate) then we return the id
-        return ($res->numRows() == 1) ? intval($res->fetchRow()[0]) : 0;
+        $row = $res->fetchRow();
+        return ($res->numRows() == 1 && $row) ? intval($row[0]) : 0;
     }
 
 

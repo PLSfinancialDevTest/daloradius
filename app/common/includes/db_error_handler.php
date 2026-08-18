@@ -34,9 +34,13 @@ if (strpos($_SERVER['PHP_SELF'], '/common/includes/db_error_handler.php') !== fa
 }
 
 function errorHandler($err) {
-    echo '<div class="failure"><strong>Database error</strong><br>'
-       . "Error message: <strong>" . $err->getMessage() . "</strong><br>"
-       . "Debug info: <br>" . $err->getDebugInfo()
+    // Log detailed error server-side for debugging
+    error_log("Database Error: " . $err->getMessage());
+    error_log("Debug Info: " . $err->getDebugInfo());
+    
+    // Show generic message to user (no internals exposed)
+    echo '<div class="failure"><strong>Database Error</strong><br>'
+       . "An error occurred while processing your request. Please try again or contact support."
        . "</div>";
 }
 

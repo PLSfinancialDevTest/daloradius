@@ -595,7 +595,8 @@ function checkUserOnline($username) {
                    $configValues['CONFIG_DB_TBL_RADACCT'], $username, $username);
     $res = $dbSocket->query($sql);
 
-    $numrows = intval($res->fetchRow()[0]);
+    $row = $res->fetchRow();
+    $numrows = ($row) ? intval($row[0]) : 0;
 
     include('../common/includes/db_close.php');
 

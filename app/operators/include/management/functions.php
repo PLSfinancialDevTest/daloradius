@@ -98,7 +98,7 @@ function add_invoice_items($dbSocket, $invoice_id='', $clean_before_adding=true)
     // insert invoice's items
     $items = 0;
     foreach ($_POST as $itemName => $value) {
-        if (substr($itemName, 0, 4) != 'item' || ( !is_array($value) && count($value) != 4 )) {
+        if (substr($itemName, 0, 4) != 'item' || !is_array($value) || count($value) != 4) {
             continue;
         }
 

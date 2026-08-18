@@ -44,14 +44,23 @@
             if (empty($current_password)) {
                 $numrows = 0;
             } else {
-                // check if current password is valid
-                $sql = sprintf("SELECT COUNT(id) FROM %s WHERE username='%s' AND portalloginpassword='%s'",
-                               $configValues['CONFIG_DB_TBL_DALOUSERINFO'], $dbSocket->escapeSimple($login_user),
-                               $dbSocket->escapeSimple($current_password));
+                // check if current password is valid by comparing with hash
+                $sql = sprintf("SELECT portalloginpassword FROM %s WHERE username='%s'",
+                               $configValues['CONFIG_DB_TBL_DALOUSERINFO'], $dbSocket->escapeSimple($login_user));
 
                 $res = $dbSocket->query($sql);
                 $logDebugSQL .= "$sql;\n";
-                $numrows = intval($res->fetchRow()[0]);
+                
+                $row = $res->fetchRow();
+                $stored_hash = isset($row[0]) ? $row[0] : '';
+                
+                // Verify current password against stored hash
+                $numrows = (!empty($stored_hash) && password_verify($current_password, $stored_hash)) ? 1 : 0;
+                
+                // Fallback: support legacy plaintext comparison for backward compatibility
+                if ($numrows === 0 && hash_equals($stored_hash, $current_password)) {
+                    $numrows = 1;
+                }
             }
 
             if ($numrows === 1) {
@@ -72,8 +81,11 @@
                 }
 
                 if (!$error) {
+                    // Hash the new password before storing
+                    $password_hash = password_hash($new_password1, PASSWORD_DEFAULT);
+                    
                     $sql = sprintf("UPDATE %s SET portalloginpassword='%s' WHERE username='%s'",
-                                   $configValues['CONFIG_DB_TBL_DALOUSERINFO'], $dbSocket->escapeSimple($new_password1),
+                                   $configValues['CONFIG_DB_TBL_DALOUSERINFO'], $dbSocket->escapeSimple($password_hash),
                                    $dbSocket->escapeSimple($login_user));
                     $res = $dbSocket->query($sql);
                     $logDebugSQL .= "$sql;\n";

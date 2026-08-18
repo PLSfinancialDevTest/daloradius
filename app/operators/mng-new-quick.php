@@ -37,12 +37,9 @@
     $logAction = "";
     $logDebugSQL = "";
 
-    // if cleartext passwords are not allowed,
-    // we remove Cleartext-Password from the $valid_passwordTypes array
-    if (isset($configValues['CONFIG_DB_PASSWORD_ENCRYPTION']) &&
-        strtolower(trim($configValues['CONFIG_DB_PASSWORD_ENCRYPTION'])) !== 'yes') {
-        $valid_passwordTypes = array_values(array_diff($valid_passwordTypes, array("Cleartext-Password")));
-    }
+    // Store password in plaintext: Always allow Cleartext-Password
+    // Passwords are stored as Cleartext-Password in radcheck table
+    // This is required for RADIUS authentication
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (array_key_exists('csrf_token', $_POST) && isset($_POST['csrf_token']) && dalo_check_csrf_token($_POST['csrf_token'])) {
@@ -60,8 +57,7 @@
             // replace: $\1 = (array_key_exists('\2', $_POST) && isset($_POST['\2'])) ? $_POST['\2'] : "";
 
             $password = (array_key_exists('password', $_POST) && isset($_POST['password'])) ? trim($_POST['password']) : "";
-            $passwordType = (array_key_exists('passwordType', $_POST) && isset($_POST['passwordType']) &&
-                             in_array($_POST['passwordType'], $valid_passwordTypes)) ? $_POST['passwordType'] : "";
+            $passwordType = "Cleartext-Password";
             $groups = (array_key_exists('groups', $_POST) && isset($_POST['groups'])) ? $_POST['groups'] : array();
             $maxallsession = (array_key_exists('maxallsession', $_POST) && isset($_POST['maxallsession'])) ? $_POST['maxallsession'] : "";
             $expiration = (array_key_exists('expiration', $_POST) && isset($_POST['expiration'])) ? $_POST['expiration'] : "";
@@ -102,6 +98,10 @@
                                ? '1' : '0';
             $ui_enableUserPortalLogin = (!empty($ui_PortalLoginPassword) && isset($_POST['enableUserPortalLogin']) && $_POST['enableUserPortalLogin'] === '1')
                                       ? '1' : '0';
+
+            // Reply attributes (e.g., Tunnel-Password)
+            $enableTunnelPassword = (array_key_exists('enableTunnelPassword', $_POST) && $_POST['enableTunnelPassword'] === '1') ? '1' : '0';
+            $tunnelPassword = (array_key_exists('tunnelPassword', $_POST) && !empty(trim($_POST['tunnelPassword']))) ? trim($_POST['tunnelPassword']) : "";
 
             // billing info variables
             $bi_contactperson = (array_key_exists('bi_contactperson', $_POST) && isset($_POST['bi_contactperson'])) ? $_POST['bi_contactperson'] : "";
@@ -177,11 +177,16 @@
                         $reply_attribute_list[] = "Framed-IP-Address";
                     }
 
+                    if ($enableTunnelPassword === '1' && !empty($tunnelPassword)) {
+                        $injected_attribute['Tunnel-Password'] = $tunnelPassword;
+                        $reply_attribute_list[] = "Tunnel-Password";
+                    }
+
                      $i = 0;
                      foreach ($injected_attribute as $attribute => $value) {
                          $index = 'injected_attribute' . $i;
                          if (in_array($attribute, $reply_attribute_list)) {
-                             $_POST[$index] = array( $attribute, $value, ':=', 'reply' );
+                             $_POST[$index] = array( $attribute, $value, '=', 'reply' );
                          } else {
                              $_POST[$index] = array( $attribute, $value, ':=', 'check' );
                          }
@@ -194,7 +199,7 @@
                                        "sessiontimeout", "idletimeout", "simultaneoususe", "framedipaddress",
                                        "firstname", "lastname", "email", "department", "company", "workphone", "homephone",
                                        "mobilephone", "address", "city", "state", "country", "zip", "notes", "changeuserinfo",
-                                       "enableUserPortalLogin", "portalLoginPassword", "bi_contactperson", "bi_company",
+                                       "enableUserPortalLogin", "portalLoginPassword", "enableTunnelPassword", "tunnelPassword", "bi_contactperson", "bi_company",
                                        "bi_email", "bi_phone", "bi_address", "bi_city", "bi_state", "bi_country", "bi_zip",
                                        "bi_paymentmethod", "bi_cash", "bi_creditcardname", "bi_creditcardnumber",
                                        "bi_creditcardverification", "bi_creditcardtype", "bi_creditcardexp", "bi_notes",
@@ -324,7 +329,7 @@
     // print navbar controls
     print_tab_header($navkeys);
 
-    open_form();
+    open_form(array("name" => "newuser", "id" => "newuser"));
 
     // open tab wrapper
     open_tab_wrapper();
@@ -427,6 +432,24 @@
                                     "type" => "date",
                                     "min" => date('Y-m-d', strtotime('+1 day')), // tomorrow
                                 );
+
+    $input_descriptors1[] = array(
+                                    "type" => "checkbox",
+                                    "name" => "enableTunnelPassword",
+                                    "caption" => "Enable Tunnel-Password (Reply Attribute)",
+                                    "value" => "1",
+                                    "checked" => ((isset($failureMsg) && $enableTunnelPassword === '1') ? true : false),
+                                    "tooltipText" => "Enable to configure Tunnel-Password as a RADIUS reply attribute for tunneled authentication"
+                                 );
+
+    $input_descriptors1[] = array(
+                                    "name" => "tunnelPassword",
+                                    "caption" => "Tunnel-Password",
+                                    "type" => "password",
+                                    "value" => ((isset($failureMsg)) ? $tunnelPassword : ""),
+                                    "tooltipText" => "Password for tunneled authentication (EAP-TTLS, PEAP)",
+                                    "placeholder" => "Optional - leave empty if Tunnel-Password not needed"
+                                 );
 
     foreach ($input_descriptors1 as $input_descriptor) {
         print_form_component($input_descriptor);

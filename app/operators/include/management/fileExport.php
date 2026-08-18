@@ -373,13 +373,15 @@ switch ($reportType) {
                            $configValues['CONFIG_DB_TBL_RADCHECK'], $batch_id);
 
             $res = $dbSocket->query($sql);
-            $exportableUsers = intval($res->fetchRow()[0]);
-            
+            $row = $res->fetchRow();
+            $exportableUsers = ($row) ? intval($row[0]) : 0;
+             
             // get batch name
             $sql = sprintf("SELECT bh.batch_name FROM %s AS bh WHERE bh.id=%d LIMIT 1",
                            $configValues['CONFIG_DB_TBL_DALOBATCHHISTORY'], $batch_id);
             $res = $dbSocket->query($sql);
-            $batch_name = $res->fetchRow()[0];
+            $row = $res->fetchRow();
+            $batch_name = ($row) ? $row[0] : "";
             
             // get all users of this batch
             $sql = sprintf("SELECT ubi.username, rc.attribute, rc.value

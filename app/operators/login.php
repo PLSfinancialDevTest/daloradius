@@ -23,6 +23,21 @@
 
 include_once("library/sessions.php");
 dalo_session_start();
+/*
+ * PLS Kerberos SSO bypass
+ * If Apache already authenticated the user, create the daloRADIUS session
+ * and bypass the local login form.
+ */
+include_once("library/pls_kerberos_sso.php");
+
+if (
+    array_key_exists('daloradius_logged_in', $_SESSION)
+    && $_SESSION['daloradius_logged_in'] === true
+) {
+    header('Location: index.php');
+    exit;
+}
+
 
 if (array_key_exists('daloradius_logged_in', $_SESSION)
     && $_SESSION['daloradius_logged_in'] !== false) {

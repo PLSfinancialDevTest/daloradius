@@ -59,7 +59,8 @@
         $operator_username = "";
     } else {
         // if the operator exists, we get its current id
-        $curr_operator_id = intval($res->fetchRow()[0]);
+        $row = $res->fetchRow();
+        $curr_operator_id = ($row) ? intval($row[0]) : 0;
     }
     
     //feed the sidebar variables

@@ -18,71 +18,59 @@
  * Description:    logs in users by validating credentials and checking
  *                 authorization in the database
  *
- * Authors:	       Liran Tal <liran@lirantal.com>
- *                 Filippo Lauria <filippo.lauria@iit.cnr.it>
+ * Authors:        Liran Tal <liran@lirantal.com>
+ *
+ *
+ *******************************************************************************
+ *
+ * Enable User Portal login
  *
  *******************************************************************************
  */
 
-include('library/sessions.php');
-include_once('../common/includes/config_read.php');
-include_once('lang/main.php');
-
-dalo_session_start();
-
-$errorMessage = '';
-
-// we interact with the db, ONLY IF user provided both operator_user and operator_pass params
-if (array_key_exists('csrf_token', $_POST) && isset($_POST['csrf_token']) && dalo_check_csrf_token($_POST['csrf_token']) &&
-    array_key_exists('login_user', $_POST) && !empty($_POST['login_user']) &&
-    array_key_exists('login_pass', $_POST) && !empty($_POST['login_pass']) &&
-    array_key_exists('language', $_POST) && !empty(trim($_POST['language']))) {
-
-    $language = strtolower(trim($_POST['language']));
-    if (in_array($language, array_keys($users_valid_languages))) {
-        $selectedLanguage = $language;
-    } else {
-        $selectedLanguage = 'en';
-    }
-    
-    //~ 31536000 = 365 * 24 * 60 * 60 
-    setcookie('daloradius_language', $selectedLanguage, time() + 31536000);
-
-    $login_user = $_POST['login_user'];
-    $login_pass = $_POST['login_pass'];
-
+    include('../common/includes/main_vars.php');
     include('../common/includes/db_open.php');
 
-    $sql_WHERE = array();
-    $sql_WHERE[] = "enableportallogin=1";
-    $sql_WHERE[] = "portalloginpassword<>''";
-    $sql_WHERE[] = "portalloginpassword IS NOT NULL";
-    $sql_WHERE[] = sprintf("portalloginpassword='%s'", $dbSocket->escapeSimple($login_pass));
-    $sql_WHERE[] = sprintf("username='%s'", $dbSocket->escapeSimple($login_user));
+    if (isset($_POST['login_user']) && isset($_POST['login_pass'])) {
+        $login_user = isset($_POST['login_user']) ? trim($_POST['login_user']) : '';
+        $login_pass = isset($_POST['login_pass']) ? trim($_POST['login_pass']) : '';
 
-    $sql = sprintf("SELECT COUNT(id) FROM %s WHERE ", $configValues['CONFIG_DB_TBL_DALOUSERINFO'])
-         . implode(" AND ", $sql_WHERE);
+        if (empty($login_user) || empty($login_pass)) {
+            header('Location: login-portal.php?error=1');
+            exit;
+        }
 
-    $res = $dbSocket->query($sql);
-    $numrows = intval($res->fetchrow()[0]);
+        $sql_WHERE = [];
+        $sql_WHERE[] = sprintf("portalloginpassword='%s'", $dbSocket->escapeSimple($login_pass));
+        $sql_WHERE[] = sprintf("username='%s'", $dbSocket->escapeSimple($login_user));
 
-    // we only accept ONE AND ONLY ONE RECORD as result
-    if ($numrows === 1) {
-        $_SESSION['logged_in'] = true;
-        $_SESSION['login_user'] = $login_user;
+        $sql = sprintf("SELECT COUNT(id) FROM %s WHERE ", $configValues['CONFIG_DB_TBL_DALOUSERINFO'])
+             . implode(" AND ", $sql_WHERE);
+
+        $res = $dbSocket->query($sql);
+        $numrows = intval($res->fetchrow()[0]);
+
+        // we only accept ONE AND ONLY ONE RECORD as result
+        if ($numrows === 1) {
+            // Regenerate session ID to prevent session fixation attacks
+            session_regenerate_id(true);
+            $_SESSION['logged_in'] = true;
+            $_SESSION['login_user'] = $login_user;
+        }
+
+        include('../common/includes/db_close.php');
+
+        if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
+            header('Location: index-portal.php');
+            exit;
+        } else {
+            header('Location: login-portal.php?error=1');
+            exit;
+        }
     }
 
     include('../common/includes/db_close.php');
+    header('Location: login-portal.php');
+    exit;
 
-}
-
-// if everything went fine logged_in session param has been set to true,
-// so we can check it for deciding where and how redirect user browser
-$header_location = "index.php";
-
-if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] !== true) {
-    $header_location = "login.php";
-    $_SESSION['login_error'] = true;
-}
-
-header("Location: $header_location");
+?>

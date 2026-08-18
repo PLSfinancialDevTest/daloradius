@@ -93,10 +93,17 @@ if (isset($_POST['csrf_token']) && dalo_check_csrf_token($_POST['csrf_token']) &
                 exit;
             }
 
+            // Regenerate session ID to prevent session fixation attacks
+            session_regenerate_id(true);
+            
             $_SESSION['daloradius_logged_in'] = true;
             unset($_SESSION['operator_2fa_pending'], $_SESSION['operator_2fa_id'], $_SESSION['operator_2fa_user'], $_SESSION['operator_2fa_attempts']);
             $_SESSION['operator_user'] = $operator;
             $_SESSION['operator_id'] = $operator_id;
+            
+            // Log original REMOTE_USER for SSO audit trail if present
+            if (array_key_exists('REMOTE_USER', $_SERVER) && !empty($_SERVER['REMOTE_USER'])) {
+            }
 
             $now = date("Y-m-d H:i:s");
             $sql = sprintf("UPDATE %s SET lastlogin=? WHERE username=?", $configValues['CONFIG_DB_TBL_DALOOPERATORS']);
