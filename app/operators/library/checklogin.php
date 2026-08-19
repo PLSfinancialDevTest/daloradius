@@ -39,7 +39,7 @@ dalo_session_start();
  * Apache mod_auth_gssapi authenticates the user and exposes REMOTE_USER.
  * Apache group authorization limits access to PLS-Store-Radius.
  */
-include_once('pls_kerberos_sso.php');
+include_once('kerberos_sso.php');
 
 if (!array_key_exists('daloradius_logged_in', $_SESSION) || $_SESSION['daloradius_logged_in'] !== true) {
     $_SESSION['daloradius_logged_in'] = false;

@@ -12,9 +12,9 @@ This document captures the Apache-side changes required so Kerberos authenticati
 
 The Apache config below is required because the application expects `REMOTE_USER`:
 
-- `app/operators/login.php` includes `library/pls_kerberos_sso.php` and auto-redirects when SSO succeeds.
-- `app/operators/library/checklogin.php` includes `pls_kerberos_sso.php` before normal login redirect logic.
-- `app/operators/library/pls_kerberos_sso.php` strips realm/domain and maps the user to `operators.username`.
+- `app/operators/login.php` includes `library/kerberos_sso.php` and auto-redirects when SSO succeeds.
+- `app/operators/library/checklogin.php` includes `kerberos_sso.php` before normal login redirect logic.
+- `app/operators/library/kerberos_sso.php` strips realm/domain and maps the user to `operators.username`.
 
 ## 1) Install/enable required Apache modules
 
@@ -92,7 +92,7 @@ If you must support legacy clients, enable fallback intentionally and document r
 
 ## 6) App/DB alignment required for SSO mapping
 
-`pls_kerberos_sso.php` normalizes:
+`kerberos_sso.php` normalizes:
 
 - `user@REALM` -> `user`
 - `DOMAIN\user` -> `user` (domain prefix stripped)
@@ -141,4 +141,4 @@ When adding this to GitHub, include:
 - Vhost `<Location /app/operators>` Kerberos directives
 - Keytab deployment path/permissions
 - Realm/SPN assumptions
-- User normalization behavior expected by `pls_kerberos_sso.php`
+- User normalization behavior expected by `kerberos_sso.php`
