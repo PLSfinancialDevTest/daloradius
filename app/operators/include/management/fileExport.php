@@ -161,7 +161,9 @@ switch ($reportType) {
                         "idletimeout" => "COALESCE(MAX(CASE WHEN rr_export.attribute='Idle-Timeout' THEN rr_export.value END), '') "
                                        . "AS idletimeout",
                         "maxdailysession" => "COALESCE(MAX(CASE WHEN rc_export.attribute='Max-Daily-Session' THEN rc_export.value END), '') "
-                                           . "AS maxdailysession"
+                                           . "AS maxdailysession",
+                        "tunnelpassword" => "COALESCE(MAX(CASE WHEN rr_export.attribute='Tunnel-Password' THEN rr_export.value END), '') "
+                                          . "AS tunnelpassword"
                      );
 
         $selected_fields = implode(", ", array_values($cols));

@@ -272,14 +272,20 @@
                 include implode(DIRECTORY_SEPARATOR, [ $configValues['OPERATORS_LIBRARY'], 'attributes.php' ]);
 
                 $counter = 0;
+                $updatedTunnelPasswords = 0;
                 foreach ($data as $subject => $arr) {
                     list( $value, $email, $firstname, $lastname, $framedipaddress, $expiration,
                           $department, $company, $mobilephone, $workphone, $homephone,
                           $address, $city, $state, $country, $zip,
                           $sessiontimeout, $idletimeout, $maxdailysession, $tunnelPassword ) = $arr;
 
-                    // skipping this user if it exists
                     if (user_exists($dbSocket, $subject)) {
+                        if (!empty($tunnelPassword) &&
+                            upsert_single_attribute($dbSocket, $subject, 'Tunnel-Password', '=', $tunnelPassword,
+                                                    $configValues['CONFIG_DB_TBL_RADREPLY'])) {
+                            $updatedTunnelPasswords++;
+                        }
+
                         continue;
                     }
 
@@ -321,7 +327,8 @@
                     }
 
                     if (!empty($tunnelPassword)) {
-                        insert_single_attribute($dbSocket, $subject, 'Tunnel-Password', '=', $tunnelPassword, $configValues['CONFIG_DB_TBL_RADREPLY']);
+                        upsert_single_attribute($dbSocket, $subject, 'Tunnel-Password', '=', $tunnelPassword,
+                                                $configValues['CONFIG_DB_TBL_RADREPLY']);
                     }
 
                     // adding user info
@@ -412,9 +419,14 @@
 
                 include implode(DIRECTORY_SEPARATOR, [ $configValues['COMMON_INCLUDES'], 'db_close.php' ]);
 
-                if ($counter > 0) {
+                if ($counter > 0 || $updatedTunnelPasswords > 0) {
                     $successMsg = "Successfully imported a total of <b>$counter</b> users to database";
                     $logAction .= "Successfully imported a total of <b>$counter</b> users to database on page: ";
+
+                    if ($updatedTunnelPasswords > 0) {
+                        $successMsg .= sprintf(" and updated Tunnel-Password for <b>%d</b> existing users", $updatedTunnelPasswords);
+                        $logAction .= sprintf(" updated Tunnel-Password for %d existing users on page: ", $updatedTunnelPasswords);
+                    }
                 } else {
                     $failureMsg = "No users have been imported to database";
                     $logAction .= "No users have been imported to database on page: ";

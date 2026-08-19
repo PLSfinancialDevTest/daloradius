@@ -152,6 +152,42 @@ function insert_single_attribute($dbSocket, $subject, $attribute, $op, $value, $
     return false;
 }
 
+function upsert_single_attribute($dbSocket, $subject, $attribute, $op, $value, $table_index='CONFIG_DB_TBL_RADCHECK') {
+    global $configValues, $logDebugSQL;
+
+    $subject = trim($subject);
+
+    if (preg_match('/^CONFIG_DB_TBL/', $table_index) !== false &&
+        array_key_exists($table_index, $configValues)) {
+
+        $param = (preg_match('/GROUP/', $table_index)) ? "groupname" : "username";
+        $table = $configValues[$table_index];
+
+        $sql = sprintf("SELECT COUNT(id) FROM %s WHERE `%s`='%s' AND `attribute`='%s'",
+                       $table, $param, $dbSocket->escapeSimple($subject), $dbSocket->escapeSimple($attribute));
+        $res = $dbSocket->getOne($sql);
+        $logDebugSQL .= "$sql;\n";
+
+        if (DB::isError($res)) {
+            return false;
+        }
+
+        if (intval($res) > 0) {
+            $sql = sprintf("UPDATE %s SET `op`='%s', `value`='%s' WHERE `%s`='%s' AND `attribute`='%s'",
+                           $table, $dbSocket->escapeSimple($op), $dbSocket->escapeSimple($value),
+                           $param, $dbSocket->escapeSimple($subject), $dbSocket->escapeSimple($attribute));
+            $res = $dbSocket->query($sql);
+            $logDebugSQL .= "$sql;\n";
+
+            return !DB::isError($res);
+        }
+
+        return insert_single_attribute($dbSocket, $subject, $attribute, $op, $value, $table_index);
+    }
+
+    return false;
+}
+
 function hotspots_exists($dbSocket, $hotspot_name) {
     global $configValues, $logDebugSQL;
     $sql = sprintf("SELECT COUNT(DISTINCT(`id`)) FROM %s WHERE `name` = '%s'",
