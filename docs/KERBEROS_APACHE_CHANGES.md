@@ -121,21 +121,68 @@ Therefore `dalooperators.username` must match normalized usernames.
 5. Confirm `REMOTE_USER` in Apache access logs (custom log format may be needed).
 6. Confirm mapped operator exists in DB.
 
-## 8) Common failure modes
+## 8) Sync daloRADIUS operators from the AD group
+
+The application maps `REMOTE_USER` to `operators.username`, so users still need matching rows in the
+`operators` and `operators_acl` tables. For environments where Apache authorization is tied to the AD-backed
+Unix group, deploy the sync helper script from the repo:
+
+`contrib/scripts/maintenance/sync-daloradius-operators-from-ad-group.sh`
+
+Recommended deployment:
+
+```bash
+sudo install -o root -g root -m 750 \
+  /var/www/daloradius/contrib/scripts/maintenance/sync-daloradius-operators-from-ad-group.sh \
+  /usr/local/sbin/sync-daloradius-operators-from-ad-group.sh
+```
+
+What the script does:
+
+- reads the AD-backed Unix group via `getent group`
+- normalizes usernames the same way the SSO flow expects (`user@REALM` -> `user`, `DOMAIN\user` -> `user`)
+- creates missing rows in `operators`
+- grants full `operators_acl` access for synced operators
+
+Example manual run:
+
+```bash
+sudo /usr/local/sbin/sync-daloradius-operators-from-ad-group.sh PLS-Store-Radius
+```
+
+If your Apache config uses a different group name, pass that group name to the script.
+
+## 9) Cron job for recurring sync
+
+Example cron entry to refresh operators every 15 minutes:
+
+```cron
+*/15 * * * * root /usr/local/sbin/sync-daloradius-operators-from-ad-group.sh PLS-Store-Radius >> /var/log/daloradius-operator-sync.log 2>&1
+```
+
+After AD group membership changes, you may also need to refresh SSSD cache and re-test login:
+
+```bash
+sudo sss_cache -E
+getent group PLS-Store-Radius
+```
+
+## 10) Common failure modes
 
 - **401 loop**: SPN/keytab mismatch or client not sending Kerberos ticket.
 - **Authenticated but redirected to login**: `REMOTE_USER` missing or mapped username absent in operators table.
+- **Authenticated but operator still missing**: run the sync script manually and confirm the expected group members are returned by `getent group`.
 - **Works in one browser only**: browser trusted-URI/Kerberos settings not configured.
 - **Intermittent failures**: clock skew between KDC, Apache host, and clients.
 
-## 9) Security notes
+## 11) Security notes
 
 - Use HTTPS only (`GssapiSSLonly On`).
 - Keep keytab readable only by root + Apache group.
 - Restrict `/app/operators` to required users/groups only.
 - Keep local daloRADIUS operator password login available as break-glass if your policy requires it.
 
-## 10) Change summary for PR description
+## 12) Change summary for PR description
 
 When adding this to GitHub, include:
 
@@ -144,3 +191,4 @@ When adding this to GitHub, include:
 - Keytab deployment path/permissions
 - Realm/SPN assumptions
 - User normalization behavior expected by `kerberos_sso.php`
+- Operator sync script deployment path and cron schedule

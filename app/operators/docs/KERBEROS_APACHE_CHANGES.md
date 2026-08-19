@@ -82,3 +82,43 @@ Use your real domain prefix value.
 4. Open `/app/operators/login.php` from a domain-joined client and confirm SSO redirect.
 5. Ensure mapped username exists in operators table.
 
+## Syncing operators from the AD-backed group
+
+When Apache access is restricted by an AD-backed Unix group, the matching daloRADIUS operator rows still need to
+exist. The repo includes a helper script for that:
+
+`contrib/scripts/maintenance/sync-daloradius-operators-from-ad-group.sh`
+
+Deploy it to the server:
+
+```bash
+sudo install -o root -g root -m 750 \
+  /var/www/daloradius/contrib/scripts/maintenance/sync-daloradius-operators-from-ad-group.sh \
+  /usr/local/sbin/sync-daloradius-operators-from-ad-group.sh
+```
+
+Run it manually:
+
+```bash
+sudo /usr/local/sbin/sync-daloradius-operators-from-ad-group.sh PLS-Store-Radius
+```
+
+The script:
+
+- reads the AD-backed group with `getent group`
+- normalizes usernames to match `kerberos_sso.php`
+- creates missing `operators` rows
+- grants full `operators_acl` access
+
+## Cron example
+
+```cron
+*/15 * * * * root /usr/local/sbin/sync-daloradius-operators-from-ad-group.sh PLS-Store-Radius >> /var/log/daloradius-operator-sync.log 2>&1
+```
+
+If group membership changes are not visible immediately, refresh SSSD cache:
+
+```bash
+sudo sss_cache -E
+getent group PLS-Store-Radius
+```
