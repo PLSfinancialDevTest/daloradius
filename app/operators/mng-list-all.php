@@ -38,8 +38,6 @@
 
     // init other useful variables
     $is_smtp_enabled = strtolower($configValues['CONFIG_MAIL_ENABLED']) === 'yes';
-    $hide_secrets = (strtolower($configValues['CONFIG_IFACE_PASSWORD_HIDDEN']) == "yes");
-
     // set session's page variable
     $_SESSION['PREV_LIST_PAGE'] = $_SERVER['REQUEST_URI'];
 
@@ -69,9 +67,7 @@
                     "username" => t('all','Username'),
                  );
 
-    if (!$hide_secrets) {
-        $cols["auth"] = t('all','Password');
-    }
+    $cols["auth"] = t('all','Password');
 
     $cols["framedipaddress"] = t('all','FramedIPAddress');
     $cols["lastlogin"] = t('all','LastLoginTime');
@@ -364,8 +360,11 @@
 
             // define table row
             $table_row = array( $checkbox, $fullname, $tooltip1 );
-            if (!$hide_secrets) {
-                $table_row[] = ($type == 'USER') ? $auth : "(n/a)";
+            if ($type == 'USER' && !empty($auth)) {
+                $secret_id = sprintf('auth-secret-%d', $count);
+                $table_row[] = get_masked_secret_str($secret_id, $auth);
+            } else {
+                $table_row[] = "(n/a)";
             }
 
             $table_row[] = $tooltip2;

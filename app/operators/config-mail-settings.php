@@ -253,6 +253,7 @@
 
     $input_descriptors0[] = array(
         "type" => "password",
+        "revealToggle" => true,
         "caption" => "SMTP Password",
         "name" => 'CONFIG_MAIL_SMTP_PASSWORD',
         "value" => (!array_key_exists('CONFIG_MAIL_SMTP_PASSWORD', $invalid_input)

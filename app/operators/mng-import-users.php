@@ -59,6 +59,51 @@
     $generatepassword = 'no';
     $generatedPasswords = array();
     $generatedCredentials = array();
+    $template_files = array(
+        'userAuth' => array(
+            'filename' => 'daloradius-import-users-template.csv',
+            'rows' => array(
+                array(
+                    'username', 'password', 'email', 'firstname', 'lastname', 'framedipaddress', 'expiration',
+                    'department', 'company', 'mobilephone', 'workphone', 'homephone', 'address', 'city', 'state',
+                    'country', 'zip', 'sessiontimeout', 'idletimeout', 'maxdailysession', 'tunnelpassword',
+                ),
+                array(
+                    'user001', 'pass123', 'user@example.com', 'John', 'Doe', '192.168.1.100', '2026-12-31',
+                    'IT', 'ACME Corp', '+1234567890', '', '', '123 Main St', 'New York', 'NY', 'USA', '10001',
+                    '3600', '600', '86400', 'reply-secret',
+                ),
+            ),
+        ),
+        'otherAuth' => array(
+            'filename' => 'daloradius-import-simple-list-template.csv',
+            'rows' => array(
+                array('username', 'email', 'firstname', 'lastname'),
+                array('AA-BB-CC-DD-EE-FF', 'user@example.com', 'John', 'Doe'),
+            ),
+        ),
+    );
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET'
+        && array_key_exists('download', $_GET)
+        && array_key_exists($_GET['download'], $template_files)) {
+        $template = $template_files[$_GET['download']];
+        $content = "";
+
+        foreach ($template['rows'] as $row) {
+            $tmp = fopen('php://temp', 'r+');
+            fputcsv($tmp, $row);
+            rewind($tmp);
+            $content .= stream_get_contents($tmp);
+            fclose($tmp);
+        }
+
+        header("Content-type: text/csv; charset=utf-8");
+        header(sprintf("Content-disposition: attachment; filename=%s; size=%s",
+                       $template['filename'], strlen($content)));
+        print $content;
+        exit;
+    }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (array_key_exists('csrf_token', $_POST) && isset($_POST['csrf_token']) && dalo_check_csrf_token($_POST['csrf_token'])) {
@@ -97,19 +142,20 @@
                     $passwordGenerated = false;
                     $arr = str_getcsv($csvLine, ",");
 
-                    // Support 5-20 fields:
+                    // Support 5-21 fields:
                     // Required (5): username, password, email, firstname, lastname
-                    // Optional (15): framedipaddress, expiration, department, company, mobilephone,
+                    // Optional (16): framedipaddress, expiration, department, company, mobilephone,
                     //                workphone, homephone, address, city, state, country, zip,
-                    //                sessiontimeout, idletimeout, maxdailysession
-                    if (count($arr) < 5 || count($arr) > 20) {
+                    //                sessiontimeout, idletimeout, maxdailysession, tunnelpassword
+                    if (count($arr) < 5 || count($arr) > 21) {
                         continue;
                     }
 
-                    // Pad to 20 fields with empty strings
+                    // Pad to 21 fields with empty strings
                     list($username, $password, $email, $firstname, $lastname, $framedipaddress, $expiration,
                          $department, $company, $mobilephone, $workphone, $homephone, $address, $city, $state,
-                         $country, $zip, $sessiontimeout, $idletimeout, $maxdailysession) = array_pad($arr, 20, '');
+                         $country, $zip, $sessiontimeout, $idletimeout, $maxdailysession,
+                         $tunnelPassword) = array_pad($arr, 21, '');
 
                     $username = trim($username);
                     $password = trim($password);
@@ -131,6 +177,7 @@
                     $sessiontimeout = trim($sessiontimeout);
                     $idletimeout = trim($idletimeout);
                     $maxdailysession = trim($maxdailysession);
+                    $tunnelPassword = trim($tunnelPassword);
 
                     if ($generatepassword === 'yes' && $password === '') {
                         $password = createPassword(8, $configValues['CONFIG_USER_ALLOWEDRANDOMCHARS'] ?? '');
@@ -177,7 +224,7 @@
                         $data[$username] = array( $password, $email, $firstname, $lastname, $framedipaddress, $expiration,
                                                   $department, $company, $mobilephone, $workphone, $homephone,
                                                   $address, $city, $state, $country, $zip,
-                                                  $sessiontimeout, $idletimeout, $maxdailysession );
+                                                  $sessiontimeout, $idletimeout, $maxdailysession, $tunnelPassword );
 
                         if ($passwordGenerated) {
                             $generatedPasswords[$username] = $password;
@@ -229,7 +276,7 @@
                     list( $value, $email, $firstname, $lastname, $framedipaddress, $expiration,
                           $department, $company, $mobilephone, $workphone, $homephone,
                           $address, $city, $state, $country, $zip,
-                          $sessiontimeout, $idletimeout, $maxdailysession ) = $arr;
+                          $sessiontimeout, $idletimeout, $maxdailysession, $tunnelPassword ) = $arr;
 
                     // skipping this user if it exists
                     if (user_exists($dbSocket, $subject)) {
@@ -271,6 +318,10 @@
                     // Insert Max-Daily-Session (radcheck table)
                     if (!empty($maxdailysession)) {
                         insert_single_attribute($dbSocket, $subject, 'Max-Daily-Session', ':=', $maxdailysession, $configValues['CONFIG_DB_TBL_RADCHECK']);
+                    }
+
+                    if (!empty($tunnelPassword)) {
+                        insert_single_attribute($dbSocket, $subject, 'Tunnel-Password', '=', $tunnelPassword, $configValues['CONFIG_DB_TBL_RADREPLY']);
                     }
 
                     // adding user info
@@ -531,33 +582,27 @@
                                         "caption" => t('all','CSVData'),
                                         "type" => "textarea",
                                         "name" => "csvdata",
-                                        "tooltipText" => 'Paste a CSV-formatted data input of users.<br/><br/>' .
-                                                         '<b>Required fields (5):</b> username,password,email,firstname,lastname<br/>' .
-                                                         t('Tooltip', 'CSVDataGeneratePasswordHint') . '<br/><br/>' .
-                                                         '<b>Optional fields (15):</b><br/>' .
-                                                         '• framedipaddress - Valid IPv4 address<br/>' .
-                                                         '• expiration - Date in YYYY-MM-DD format<br/>' .
-                                                         '• department - Department name<br/>' .
-                                                         '• company - Company name<br/>' .
-                                                         '• mobilephone - Mobile phone number<br/>' .
-                                                         '• workphone - Work phone number<br/>' .
-                                                         '• homephone - Home phone number<br/>' .
-                                                         '• address - Street address<br/>' .
-                                                         '• city - City name<br/>' .
-                                                         '• state - State/Province<br/>' .
-                                                         '• country - Country name<br/>' .
-                                                         '• zip - Postal/ZIP code<br/>' .
-                                                         '• sessiontimeout - Session timeout in seconds<br/>' .
-                                                         '• idletimeout - Idle timeout in seconds<br/>' .
-                                                         '• maxdailysession - Max daily session in seconds<br/><br/>' .
-                                                         '<b>Example:</b> user001,pass123,user@example.com,John,Doe,192.168.1.100,2026-12-31,IT,ACME Corp,+1234567890,,,New York,NY,USA,10001,3600,600,86400<br/><br/>' .
-                                                         'Note: Rows with more than 20 CSV fields will be skipped.',
+                                        "tooltipText" => "Paste CSV user data here, or use the downloadable template below.\n\n" .
+                                                         "Required fields (5): username, password, email, firstname, lastname.\n\n" .
+                                                         t('Tooltip', 'CSVDataGeneratePasswordHint') . "\n\n" .
+                                                         "Optional fields (16), in order:\n" .
+                                                         "framedipaddress (valid IPv4), expiration (YYYY-MM-DD), department, company,\n" .
+                                                         "mobilephone, workphone, homephone, address, city, state, country, zip,\n" .
+                                                         "sessiontimeout, idletimeout, maxdailysession, tunnelpassword (Tunnel-Password reply attribute).\n\n" .
+                                                         "Example:\n" .
+                                                         "user001,pass123,user@example.com,John,Doe,192.168.1.100,2026-12-31,IT,ACME Corp,+1234567890,,,123 Main St,New York,NY,USA,10001,3600,600,86400,reply-secret\n\n" .
+                                                         "Rows with more than 21 CSV fields will be skipped.",
+                                        "preserveNewlines" => true,
                                         "content" => ((isset($failureMsg)) ? $csvdata : ""),
                                      );
 
         foreach ($input_descriptors1 as $input_descriptor) {
             print_form_component($input_descriptor);
         }
+
+        echo '<div class="mb-3">';
+        echo '<a class="btn btn-secondary" href="mng-import-users.php?download=userAuth">Download user CSV template</a>';
+        echo '</div>';
 
         close_fieldset();
 
@@ -581,6 +626,10 @@
         foreach ($input_descriptors2 as $input_descriptor) {
             print_form_component($input_descriptor);
         }
+
+        echo '<div class="mb-3">';
+        echo '<a class="btn btn-secondary" href="mng-import-users.php?download=otherAuth">Download MAC/PIN CSV template</a>';
+        echo '</div>';
 
         close_fieldset();
 

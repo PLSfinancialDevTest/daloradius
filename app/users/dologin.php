@@ -28,49 +28,68 @@
  *******************************************************************************
  */
 
-    include('../common/includes/main_vars.php');
-    include('../common/includes/db_open.php');
+    include_once implode(DIRECTORY_SEPARATOR, [ __DIR__, '..', 'common', 'includes', 'config_read.php' ]);
+    include implode(DIRECTORY_SEPARATOR, [ __DIR__, 'library', 'sessions.php' ]);
 
-    if (isset($_POST['login_user']) && isset($_POST['login_pass'])) {
-        $login_user = isset($_POST['login_user']) ? trim($_POST['login_user']) : '';
-        $login_pass = isset($_POST['login_pass']) ? trim($_POST['login_pass']) : '';
+    dalo_session_start();
 
-        if (empty($login_user) || empty($login_pass)) {
-            header('Location: login-portal.php?error=1');
+    $authenticated = false;
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST'
+        && isset($_POST['csrf_token']) && dalo_check_csrf_token($_POST['csrf_token'])
+        && isset($_POST['login_user']) && isset($_POST['login_pass'])) {
+
+        $login_user = trim($_POST['login_user']);
+        $login_pass = trim($_POST['login_pass']);
+
+        if (!empty($login_user) && !empty($login_pass)) {
+            include implode(DIRECTORY_SEPARATOR, [ __DIR__, '..', 'common', 'includes', 'db_open.php' ]);
+
+            $sql = sprintf("SELECT username, portalloginpassword FROM %s WHERE username=?",
+                           $configValues['CONFIG_DB_TBL_DALOUSERINFO']);
+            $stmt = $dbSocket->prepare($sql);
+            $res = $dbSocket->execute($stmt, [ $login_user ]);
+            $dbSocket->freePrepared($stmt);
+
+            if (!DB::isError($res) && $res->numRows() === 1) {
+                $row = $res->fetchRow(DB_FETCHMODE_ASSOC);
+                $stored_password = isset($row['portalloginpassword']) ? $row['portalloginpassword'] : '';
+                $verified = (!empty($stored_password) && password_verify($login_pass, $stored_password));
+                $legacy_verified = (!$verified && !empty($stored_password) && hash_equals($stored_password, $login_pass));
+
+                if ($verified || $legacy_verified) {
+                    if ($legacy_verified || ($verified && password_needs_rehash($stored_password, PASSWORD_DEFAULT))) {
+                        $sql = sprintf("UPDATE %s SET portalloginpassword=? WHERE username=?",
+                                       $configValues['CONFIG_DB_TBL_DALOUSERINFO']);
+                        $stmt = $dbSocket->prepare($sql);
+                        $res = $dbSocket->execute($stmt, [ password_hash($login_pass, PASSWORD_DEFAULT), $login_user ]);
+                        $dbSocket->freePrepared($stmt);
+                    }
+
+                    session_regenerate_id(true);
+                    $_SESSION['logged_in'] = true;
+                    $_SESSION['login_user'] = $login_user;
+                    unset($_SESSION['login_error']);
+                    $authenticated = true;
+                }
+            }
+
+            include implode(DIRECTORY_SEPARATOR, [ __DIR__, '..', 'common', 'includes', 'db_close.php' ]);
+        }
+
+        if ($authenticated) {
+            header('Location: index.php');
             exit;
         }
 
-        $sql_WHERE = [];
-        $sql_WHERE[] = sprintf("portalloginpassword='%s'", $dbSocket->escapeSimple($login_pass));
-        $sql_WHERE[] = sprintf("username='%s'", $dbSocket->escapeSimple($login_user));
-
-        $sql = sprintf("SELECT COUNT(id) FROM %s WHERE ", $configValues['CONFIG_DB_TBL_DALOUSERINFO'])
-             . implode(" AND ", $sql_WHERE);
-
-        $res = $dbSocket->query($sql);
-        $numrows = intval($res->fetchrow()[0]);
-
-        // we only accept ONE AND ONLY ONE RECORD as result
-        if ($numrows === 1) {
-            // Regenerate session ID to prevent session fixation attacks
-            session_regenerate_id(true);
-            $_SESSION['logged_in'] = true;
-            $_SESSION['login_user'] = $login_user;
-        }
-
-        include('../common/includes/db_close.php');
-
-        if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-            header('Location: index-portal.php');
-            exit;
-        } else {
-            header('Location: login-portal.php?error=1');
-            exit;
-        }
+        $_SESSION['logged_in'] = false;
+        unset($_SESSION['login_user']);
+        $_SESSION['login_error'] = true;
+        header('Location: login.php');
+        exit;
     }
-
-    include('../common/includes/db_close.php');
-    header('Location: login-portal.php');
+    header('Location: login.php');
+    header('Location: login.php');
     exit;
 
 ?>

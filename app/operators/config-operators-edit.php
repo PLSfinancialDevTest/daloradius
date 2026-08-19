@@ -196,9 +196,6 @@
 
     include('../common/includes/db_close.php');
 
-    $hiddenPassword = (strtolower($configValues['CONFIG_IFACE_PASSWORD_HIDDEN']) == "yes")
-                    ? 'password' : 'text';
-
     include_once("lang/main.php");
     
     include("../common/includes/layout.php");
@@ -246,9 +243,10 @@
                                         "id" => "operator_password",
                                         "name" => "operator_password",
                                         "caption" => t('all','Password'),
-                                        "type" => $hiddenPassword,
+                                        "type" => "password",
                                         "value" => "",
-                                        "random" => true
+                                        "random" => true,
+                                        "revealToggle" => true
                                      );
 
         $totp_status = (intval($operator_totp_enabled) === 1)

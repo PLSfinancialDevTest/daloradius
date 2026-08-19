@@ -55,12 +55,21 @@ if (isset($configValues['DALORADIUS_VERSION'])) {
     }
 }
 
+if (!empty($configValues['DALORADIUS_CUSTOM_VERSION'])) {
+    $content .= "<br>custom build " . htmlspecialchars($configValues['DALORADIUS_CUSTOM_VERSION'], ENT_QUOTES, 'UTF-8');
+    if (!empty($configValues['DALORADIUS_CUSTOM_BUILD_VERSION'])) {
+        $content .= " v" . htmlspecialchars($configValues['DALORADIUS_CUSTOM_BUILD_VERSION'], ENT_QUOTES, 'UTF-8');
+    }
+}
+
 $descriptors3[] = array(
                             'type' => 'textarea',
                             'content' => sprintf('daloRADIUS - RADIUS Management%s', $content),
-                            'readmore' => array( 'href' => 'https://github.com/lirantal/daloradius',
-                                                 'title' => 'Read More',
-                                                 'label' => 'Read More',
+                            'readmore' => array( 'href' => (!empty($configValues['DALORADIUS_CUSTOM_REPOSITORY'])
+                                                           ? $configValues['DALORADIUS_CUSTOM_REPOSITORY']
+                                                           : 'https://github.com/PLSfinancialDevTest/daloradius'),
+                                                'title' => 'Read More',
+                                                'label' => 'Read More',
                                                ),
                       );
 

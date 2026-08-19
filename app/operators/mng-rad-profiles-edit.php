@@ -121,7 +121,9 @@
 
                 $descriptor = array( 'onclick' => $onclick, 'attribute' => $row[0], 'select_name' => $name, 'selected_option' => $row[1],
                                      'id__attribute' => $id__attribute, 'type' => $type, 'value' => $row[2], 'name' => $name,
-                                     'attr_type' => $row[3], 'attr_desc' => $row[4], 'table' => $table_name);
+                                     'attr_type' => $row[3], 'attr_desc' => $row[4], 'table' => $table_name,
+                                     'id' => sprintf('%s-secret-%d', preg_replace('/[^A-Za-z0-9_-]/', '-', $table_name), $id),
+                                     'revealToggle' => ($type === "password"));
 
                 print_edit_attribute($descriptor);
             }

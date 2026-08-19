@@ -42,11 +42,7 @@
                     "username" => t('all','Username')
                  );
     
-    if (strtolower($configValues['CONFIG_IFACE_PASSWORD_HIDDEN']) === "yes") {
-        $cols[] = t('all','Password');
-    } else {
-        $cols["auth"] = t('all','Password');
-    }
+    $cols["auth"] = t('all','Password');
     
     $cols["fullname"] = "Full name";
     $cols["title"] = "Title";
@@ -147,10 +143,6 @@
             
             list($id, $username, $auth, $fullname, $title) = $row;
             
-            if (strtolower($configValues['CONFIG_IFACE_PASSWORD_HIDDEN']) === "yes") {
-                $auth = "[Password is hidden]";
-            }
-            
             // preparing checkboxes and tooltips stuff
             $tooltip = array(
                                 'subject' => $username,
@@ -166,7 +158,8 @@
             $checkbox = get_checkbox_str($d);
 
             // build table row
-            $table_row = array( $checkbox, $tooltip, $auth, $fullname, $title );
+            $secret_id = sprintf('operator-auth-secret-%d', $count);
+            $table_row = array( $checkbox, $tooltip, get_masked_secret_str($secret_id, $auth), $fullname, $title );
 
             // print table row
             print_table_row($table_row);

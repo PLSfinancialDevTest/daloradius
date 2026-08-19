@@ -409,10 +409,6 @@
 
     include_once('../common/includes/config_read.php');
 
-    $hiddenPassword = (strtolower($configValues['CONFIG_IFACE_PASSWORD_HIDDEN']) == "yes")
-                    ? 'password' : 'text';
-
-
     // print HTML prologue
     $extra_css = array();
 
@@ -471,9 +467,10 @@
         $input_descriptors0[] = array(
                                         "name" => "password",
                                         "caption" => t('all','Password'),
-                                        "type" => $hiddenPassword,
+                                        "type" => "password",
                                         "value" => "",
                                         "random" => true,
+                                        "revealToggle" => true,
                                         "tooltipText" => t('Tooltip','passwordTooltip')
                                     );
 

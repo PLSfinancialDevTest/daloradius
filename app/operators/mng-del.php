@@ -81,7 +81,7 @@
                         
                         $check_attr_count = intval($res->fetchrow()[0]);
                         
-                        $sql = sprintf("SELECT COUNT(`id`) FROM %s WHERE username='%s' AND attribute='Auth-Type' OR attribute LIKE '%%-Password'",
+                        $sql = sprintf("SELECT COUNT(`id`) FROM %s WHERE username='%s' AND (attribute='Auth-Type' OR attribute LIKE '%%-Password')",
                                        $configValues['CONFIG_DB_TBL_RADCHECK'], $dbSocket->escapeSimple($usernames[0]));
                         $res = $dbSocket->query($sql);
                         $logDebugSQL .= "$sql;\n";

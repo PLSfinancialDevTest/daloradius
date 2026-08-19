@@ -30,3 +30,6 @@ if (strpos($_SERVER['PHP_SELF'], '/common/includes/version.php') !== false) {
 
 $configValues['DALORADIUS_VERSION'] = '2.3';
 $configValues['DALORADIUS_DATE'] = '22 May 2026';
+$configValues['DALORADIUS_CUSTOM_VERSION'] = 'PLSfinancialDevTest';
+$configValues['DALORADIUS_CUSTOM_BUILD_VERSION'] = '1';
+$configValues['DALORADIUS_CUSTOM_REPOSITORY'] = 'https://github.com/PLSfinancialDevTest/daloradius';

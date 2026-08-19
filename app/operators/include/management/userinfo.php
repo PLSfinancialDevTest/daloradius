@@ -90,13 +90,13 @@ $_input_descriptors1[] = array( 'id' => 'zip', 'caption' => t('ContactInfo','Zip
 $_input_descriptors2 = array();
 
 $_input_descriptors2[] = array(
-                                    'id' => 'portalLoginPassword',
-                                    'caption' => t('ContactInfo','PortalLoginPassword'),
-                                    'type' => 'text',
-                                    'name' => 'portalLoginPassword',
-                                    'value' => ((isset($ui_PortalLoginPassword)) ? $ui_PortalLoginPassword : ''),
-                                    'tooltipText' => sprintf('If this field is empty then fields "%s" and "%s" are forced to "no"',
-                                                              t('ContactInfo','EnableUserUpdate'), t('ContactInfo','EnablePortalLogin')),
+                                   'id' => 'portalLoginPassword',
+                                   'caption' => t('ContactInfo','PortalLoginPassword'),
+                                   'type' => 'password',
+                                   'name' => 'portalLoginPassword',
+                                   'revealToggle' => true,
+                                   'tooltipText' => sprintf('Leave blank to keep the current portal password. If no portal password exists, fields "%s" and "%s" are forced to "no".',
+                                                             t('ContactInfo','EnableUserUpdate'), t('ContactInfo','EnablePortalLogin')),
                               );
 
 $_input_descriptors2[] = array(

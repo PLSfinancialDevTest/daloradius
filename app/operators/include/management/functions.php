@@ -495,6 +495,52 @@ function make_update_query($table, $escaped_username, $fields, $values) {
     return $sql;
 }
 
+function get_user_portal_login_password($dbSocket, $username) {
+    global $configValues, $logDebugSQL;
+
+    $sql = sprintf("SELECT portalloginpassword FROM %s WHERE username='%s' LIMIT 1",
+                   $configValues['CONFIG_DB_TBL_DALOUSERINFO'], $dbSocket->escapeSimple($username));
+    $res = $dbSocket->query($sql);
+    $logDebugSQL .= "$sql;\n";
+
+    if (DB::isError($res) || $res->numRows() === 0) {
+        return "";
+    }
+
+    $row = $res->fetchRow();
+    return ($row && isset($row[0])) ? trim($row[0]) : "";
+}
+
+function has_effective_user_portal_login_password($dbSocket, $username, $raw_password, $userinfo_exists) {
+    if (!empty(trim($raw_password))) {
+        return true;
+    }
+
+    if (!$userinfo_exists || empty($username)) {
+        return false;
+    }
+
+    return !empty(get_user_portal_login_password($dbSocket, $username));
+}
+
+function normalize_user_portal_login_password_params($dbSocket, $username, $params, $preserve_existing_password) {
+    if (!array_key_exists('portalloginpassword', $params)) {
+        return $params;
+    }
+
+    $password = trim($params['portalloginpassword']);
+    if (empty($password)) {
+        if ($preserve_existing_password) {
+            unset($params['portalloginpassword']);
+        }
+
+        return $params;
+    }
+
+    $params['portalloginpassword'] = password_hash($password, PASSWORD_DEFAULT);
+    return $params;
+}
+
 function update_info($dbSocket, $username, $params, $allowedFields, $skipFields, $table_index) {
     global $configValues, $logDebugSQL;
 
@@ -528,6 +574,7 @@ function update_user_info($dbSocket, $username, $params) {
 
     $skipFields = array( "id", "username" );
 
+    $params = normalize_user_portal_login_password_params($dbSocket, $username, $params, true);
     return update_info($dbSocket, $username, $params, $allowedFields, $skipFields, 'CONFIG_DB_TBL_DALOUSERINFO');
 }
 
@@ -578,6 +625,7 @@ function add_user_info($dbSocket, $username, $params) {
 
     $skipFields = array( "id", "username" );
 
+    $params = normalize_user_portal_login_password_params($dbSocket, $username, $params, false);
     return add_info($dbSocket, $username, $params, $allowedFields, $skipFields, 'CONFIG_DB_TBL_DALOUSERINFO');
 }
 

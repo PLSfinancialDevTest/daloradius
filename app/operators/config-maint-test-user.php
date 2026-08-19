@@ -226,6 +226,7 @@
             "name" => "password1",
             "caption" => t('all','Password'),
             "type" => "password",
+            "revealToggle" => true,
             "value" => ((isset($password)) ? $password : ""),
             "tooltipText" => "Password for the user being tested. (Required)"
         );
@@ -233,6 +234,7 @@
             "name" => "password2",
             "caption" => t('all','Password') . " (confirmation)",
             "type" => "password",
+            "revealToggle" => true,
             "value" => ((isset($password)) ? $password : ""),
             "tooltipText" => "Re-enter the password to confirm it matches. (Required)"
         );

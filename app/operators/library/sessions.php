@@ -50,6 +50,10 @@ function dalo_check_csrf_token($token=null) {
         return false;
     }
 
+    if (!array_key_exists('csrf_token', $_SESSION) || empty($_SESSION['csrf_token'])) {
+        return false;
+    }
+
     // this should provide backward compatibility with PHP < 5.6.0
     $result = (function_exists('hash_equals'))
             ? hash_equals($_SESSION['csrf_token'], $token)
@@ -69,8 +73,21 @@ function dalo_session_start() {
     // Change PHPSESSID for better security, remove this if set in php.ini
     session_name('daloradius_operator_sid');
 
-    // Secure session_set_cookie_params
-    session_set_cookie_params(0, '/', null, null, true);
+    $is_secure_request = (
+        (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && intval($_SERVER['SERVER_PORT']) === 443)
+    );
+
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params(array(
+            'lifetime' => 0,
+            'path' => '/',
+            'secure' => $is_secure_request,
+            'httponly' => true,
+        ));
+    } else {
+        session_set_cookie_params(0, '/', '', $is_secure_request, true);
+    }
     
     session_start();
     

@@ -36,6 +36,16 @@
     include implode(DIRECTORY_SEPARATOR, [ $configValues['OPERATORS_INCLUDE_MANAGEMENT'], 'pages_common.php' ]);
     include implode(DIRECTORY_SEPARATOR, [ $configValues['COMMON_INCLUDES'], 'db_open.php' ]);
 
+    $custom_repository = !empty($configValues['DALORADIUS_CUSTOM_REPOSITORY'])
+                       ? $configValues['DALORADIUS_CUSTOM_REPOSITORY']
+                       : 'https://github.com/PLSfinancialDevTest/daloradius';
+    $custom_version = !empty($configValues['DALORADIUS_CUSTOM_VERSION'])
+                    ? $configValues['DALORADIUS_CUSTOM_VERSION']
+                    : '';
+    $custom_build_version = !empty($configValues['DALORADIUS_CUSTOM_BUILD_VERSION'])
+                          ? $configValues['DALORADIUS_CUSTOM_BUILD_VERSION']
+                          : '';
+
     // setting table-related parameters first
     $tableSetting = [
         'postauth' => [
@@ -158,13 +168,40 @@ HTML;
 
     $version = t('all', 'daloRADIUS');
     $copyright = strip_tags(t('all', 'copyright2'));
+    $version_details = array();
+
+    if (!empty($configValues['DALORADIUS_VERSION'])) {
+        $version_details[] = sprintf("Version %s", $configValues['DALORADIUS_VERSION']);
+    }
+
+    if (!empty($configValues['DALORADIUS_DATE'])) {
+        $version_details[] = sprintf("Release date %s", $configValues['DALORADIUS_DATE']);
+    }
+
+    if (!empty($custom_version)) {
+        $custom_build_label = sprintf("Custom build %s", $custom_version);
+        if (!empty($custom_build_version)) {
+            $custom_build_label .= sprintf(" v%s", $custom_build_version);
+        }
+        $version_details[] = $custom_build_label;
+    }
+
+    $popover_content = $copyright;
+    if (count($version_details) > 0) {
+        $popover_content .= "\n" . implode("\n", $version_details);
+    }
+
+    $popover_title = htmlspecialchars($version, ENT_QUOTES, 'UTF-8');
+    $popover_content = htmlspecialchars($popover_content, ENT_QUOTES, 'UTF-8');
+    $custom_repository = htmlspecialchars($custom_repository, ENT_QUOTES, 'UTF-8');
     
     echo <<<HTML
 <span class="d-flex align-items-center justify-content-start mb-2">
     <h1 class="fs-4 m-0">daloRADIUS</h1>
-    <a tabindex="0" class="ms-2 text-decoration-none btn btn-light" role="button" data-bs-trigger="focus" data-bs-toggle="popover" data-bs-placement="bottom" data-bs-title="{$version}" data-bs-content="{$copyright}">
+    <a tabindex="0" class="ms-2 text-decoration-none btn btn-light" role="button" data-bs-trigger="focus" data-bs-toggle="popover" data-bs-placement="bottom" data-bs-title="{$popover_title}" data-bs-content="{$popover_content}">
         <i class="fs-6 bi bi-c-circle"></i>
     </a>
+    <a class="ms-2 btn btn-outline-secondary btn-sm" href="{$custom_repository}" target="_blank" rel="noopener noreferrer">Read More</a>
 </span>
 
 HTML;

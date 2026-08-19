@@ -176,10 +176,6 @@
         }
     } // if form was submitted
     
-    $hiddenPassword = (strtolower($configValues['CONFIG_IFACE_PASSWORD_HIDDEN']) == "yes")
-                    ? 'password' : 'text';
-    
-
     // print HTML prologue
     $extra_css = array();
     
@@ -212,9 +208,10 @@
                                         "id" => "operator_password",
                                         "name" => "operator_password",
                                         "caption" => t('all','Password'),
-                                        "type" => $hiddenPassword,
+                                        "type" => "password",
                                         "value" => ((isset($operator_password)) ? $operator_password : ""),
-                                        "random" => true
+                                        "random" => true,
+                                        "revealToggle" => true
                                      );
         
         // set navbar stuff

@@ -63,6 +63,7 @@
         
         // Check for database errors
         if (DB::isError($result)) {
+            error_log("Database error in checkOperatorBillingAccess: " . $result->getMessage());
             return false; // Deny access on error for security
         }
         
@@ -87,8 +88,6 @@
         
         return false; // No billing permission found
     }
-
-    $hasBillingAccess = checkOperatorBillingAccess($_SESSION['operator_id'] ?? '');
 
     // updates old plan profile with a new one
     // or simply add a new plan profile
@@ -117,6 +116,8 @@
                 $logDebugSQL .= "$sql;\n";
 
 		if (DB::isError($res)) {
+			error_log("daloRADIUS mng-edit SQL error: " . $res->getMessage());
+			error_log("daloRADIUS mng-edit SQL query: " . $sql);
 			die("Database query failed. Check /var/log/apache2/storeradius-error.log");
 		}
             }
@@ -144,14 +145,8 @@
 
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        if (array_key_exists('username', $_POST) && !empty(str_replace("%", "", trim($_POST['username'])))) {
-            $username = str_replace("%", "", trim($_POST['username']));
-        } elseif (array_key_exists('username', $_REQUEST) && !empty(str_replace("%", "", trim($_REQUEST['username'])))) {
-            // Fallback for POST flows where username is not part of submitted payload.
-            $username = str_replace("%", "", trim($_REQUEST['username']));
-        } else {
-            $username = "";
-        }
+        $username = (array_key_exists('username', $_POST) && !empty(str_replace("%", "", trim($_POST['username']))))
+                  ? str_replace("%", "", trim($_POST['username'])) : "";
     } else {
         $username = (array_key_exists('username', $_REQUEST) && !empty(str_replace("%", "", trim($_REQUEST['username']))))
                   ? str_replace("%", "", trim($_REQUEST['username'])) : "";
@@ -201,8 +196,11 @@
             $ui_PortalLoginPassword = (isset($_POST['portalLoginPassword']) && !empty(trim($_POST['portalLoginPassword'])))
                                     ? trim($_POST['portalLoginPassword']) : "";
 
-            $request_changeuserinfo = (isset($_POST['changeUserInfo']) && $_POST['changeUserInfo'] === '1');
-            $request_enableUserPortalLogin = (isset($_POST['enableUserPortalLogin']) && $_POST['enableUserPortalLogin'] === '1');
+            // these are forced to 0 (disabled) if user portal login password is empty
+            $ui_changeuserinfo = (!empty($ui_PortalLoginPassword) && isset($_POST['changeUserInfo']) && $_POST['changeUserInfo'] === '1')
+                               ? '1' : '0';
+            $ui_enableUserPortalLogin = (!empty($ui_PortalLoginPassword) &&  isset($_POST['enableUserPortalLogin']) && $_POST['enableUserPortalLogin'] === '1')
+                                      ? '1' : '0';
 
             $bi_contactperson = (array_key_exists('bi_contactperson', $_POST) && isset($_POST['bi_contactperson'])) ? $_POST['bi_contactperson'] : "";
             $bi_company = (array_key_exists('bi_company', $_POST) && isset($_POST['bi_company'])) ? $_POST['bi_company'] : "";
@@ -237,90 +235,16 @@
             $bi_faxinvoice = (array_key_exists('bi_faxinvoice', $_POST) && isset($_POST['bi_faxinvoice'])) ? $_POST['bi_faxinvoice'] : "";
             $bi_emailinvoice = (array_key_exists('bi_emailinvoice', $_POST) && isset($_POST['bi_emailinvoice'])) ? $_POST['bi_emailinvoice'] : "";
 
-            $request_changeuserbillinfo = (isset($_POST['bi_changeuserbillinfo']) && $_POST['bi_changeuserbillinfo'] === '1');
+            // this is forced to 0 (disabled) if user portal login password is empty
+            $bi_changeuserbillinfo = (!empty($ui_PortalLoginPassword) && isset($_POST['bi_changeuserbillinfo']) && $_POST['bi_changeuserbillinfo'] === '1')
+                                   ? '1' : '0';
 
             $planName = (array_key_exists('planName', $_POST) && isset($_POST['planName'])) ? trim($_POST['planName']) : "";
             $oldplanName = (array_key_exists('oldplanName', $_POST) && isset($_POST['oldplanName'])) ? trim($_POST['oldplanName']) : "";
-            $isAddReplyAttributeRequest = (array_key_exists('is_add_reply_attribute_request', $_POST)
-                                        && $_POST['is_add_reply_attribute_request'] === '1');
 
 
-            if (!empty($username) && $isAddReplyAttributeRequest) {
-                $replyAttrAuditAction = "reply-attribute-add-failed";
-                $reply_attr_name = (isset($_POST['reply_attribute_name']) && !empty(trim($_POST['reply_attribute_name']))) ? trim($_POST['reply_attribute_name']) : "";
-                $reply_attr_op = (isset($_POST['reply_attribute_op']) && in_array(trim($_POST['reply_attribute_op']), $valid_ops))
-                               ? trim($_POST['reply_attribute_op']) : "=";
-                $reply_attr_value = (isset($_POST['reply_attribute_value']) && !empty(trim($_POST['reply_attribute_value']))) ? trim($_POST['reply_attribute_value']) : "";
 
-                if (!empty($reply_attr_name) && !empty($reply_attr_value)) {
-                    $checkSql = sprintf("SELECT COUNT(*) AS cnt FROM %s WHERE username='%s' AND attribute='%s'",
-                                       $configValues['CONFIG_DB_TBL_RADREPLY'],
-                                       $dbSocket->escapeSimple($username),
-                                       $dbSocket->escapeSimple($reply_attr_name));
-                    $checkRes = $dbSocket->query($checkSql);
-                    $logDebugSQL .= "$checkSql;\n";
-
-                    if (DB::isError($checkRes)) {
-                        $failureMsg = "Error checking existing reply attribute: " . $checkRes->getMessage();
-                        $logAction .= "failed checking existing reply attribute on page: ";
-                    } else {
-                        $checkRow = $checkRes->fetchRow();
-
-                        if ($checkRow[0] > 0) {
-                            $sql = sprintf("UPDATE %s SET op='%s', value='%s' WHERE username='%s' AND attribute='%s'",
-                                           $configValues['CONFIG_DB_TBL_RADREPLY'],
-                                           $dbSocket->escapeSimple($reply_attr_op),
-                                           $dbSocket->escapeSimple($reply_attr_value),
-                                           $dbSocket->escapeSimple($username),
-                                           $dbSocket->escapeSimple($reply_attr_name));
-                            $res = $dbSocket->query($sql);
-                            $logDebugSQL .= "$sql;\n";
-
-                            if (DB::isError($res)) {
-                                $failureMsg = "Error updating reply attribute: " . $res->getMessage();
-                                $logAction .= "failed updating reply attribute on page: ";
-                                $replyAttrAuditAction = "reply-attribute-update-failed";
-                            } else {
-                                $successMsg = "Reply attribute updated successfully";
-                                $logAction .= "successfully updated reply attribute on page: ";
-                                $replyAttrAuditAction = "reply-attribute-updated";
-                            }
-                        } else {
-                            $sql = sprintf("INSERT INTO %s (username, attribute, op, value) VALUES ('%s', '%s', '%s', '%s')",
-                                           $configValues['CONFIG_DB_TBL_RADREPLY'],
-                                           $dbSocket->escapeSimple($username),
-                                           $dbSocket->escapeSimple($reply_attr_name),
-                                           $dbSocket->escapeSimple($reply_attr_op),
-                                           $dbSocket->escapeSimple($reply_attr_value));
-                            $res = $dbSocket->query($sql);
-                            $logDebugSQL .= "$sql;\n";
-
-                            if (DB::isError($res)) {
-                                $failureMsg = "Error adding reply attribute: " . $res->getMessage();
-                                $logAction .= "failed adding reply attribute on page: ";
-                                $replyAttrAuditAction = "reply-attribute-add-failed";
-                            } else {
-                                $successMsg = "Reply attribute added successfully";
-                                $logAction .= "successfully added reply attribute on page: ";
-                                $replyAttrAuditAction = "reply-attribute-added";
-                            }
-                        }
-                    }
-                } else {
-                    $failureMsg = "Attribute name and value are required";
-                    $logAction .= "missing reply attribute name or value on page: ";
-                }
-
-                $auditLog = sprintf(
-                    "[%s] operator=%s remoteUser=%s action=%s username=%s attribute=%s",
-                    date('Y-m-d H:i:s'),
-                    $_SESSION['operator_id'] ?? 'unknown',
-                    $ssoUser,
-                    $replyAttrAuditAction,
-                    $username,
-                    $reply_attr_name
-                );
-            } elseif (!empty($username) && !$isAddReplyAttributeRequest) {
+            if (!empty($username)) {
 
                 // dealing with attributes
                 include("library/attributes.php");
@@ -348,14 +272,10 @@
                     $ssoUser,
                     $username
                 );
+                error_log($auditLog);
 
                 // insert or update user info
                 $userinfoExist = user_exists($dbSocket, $username, 'CONFIG_DB_TBL_DALOUSERINFO');
-                $hasPortalLoginPassword = has_effective_user_portal_login_password($dbSocket, $username,
-                                                                                   $ui_PortalLoginPassword, $userinfoExist);
-                $ui_changeuserinfo = ($hasPortalLoginPassword && $request_changeuserinfo) ? '1' : '0';
-                $ui_enableUserPortalLogin = ($hasPortalLoginPassword && $request_enableUserPortalLogin) ? '1' : '0';
-                $bi_changeuserbillinfo = ($hasPortalLoginPassword && $request_changeuserbillinfo) ? '1' : '0';
 
                 $params = array(
                                     "firstname" => $firstname,
@@ -388,61 +308,57 @@
                 }
 
 
-                if ($hasBillingAccess) {
-                    // insert or update billing info
-                    $billinfoExist = user_exists($dbSocket, $username, 'CONFIG_DB_TBL_DALOUSERBILLINFO');
+                // insert or update billing info
+                $billinfoExist = user_exists($dbSocket, $username, 'CONFIG_DB_TBL_DALOUSERBILLINFO');
 
-                    $params = array(
-                                        "contactperson" => $bi_contactperson,
-                                        "company" => $bi_company,
-                                        "email" => $bi_email,
-                                        "phone" => $bi_phone,
-                                        "address" => $bi_address,
-                                        "city" => $bi_city,
-                                        "state" => $bi_state,
-                                        "country" => $bi_country,
-                                        "zip" => $bi_zip,
-                                        "postalinvoice" => $bi_postalinvoice,
-                                        "faxinvoice" => $bi_faxinvoice,
-                                        "emailinvoice" => $bi_emailinvoice,
+                $params = array(
+                                    "contactperson" => $bi_contactperson,
+                                    "company" => $bi_company,
+                                    "email" => $bi_email,
+                                    "phone" => $bi_phone,
+                                    "address" => $bi_address,
+                                    "city" => $bi_city,
+                                    "state" => $bi_state,
+                                    "country" => $bi_country,
+                                    "zip" => $bi_zip,
+                                    "postalinvoice" => $bi_postalinvoice,
+                                    "faxinvoice" => $bi_faxinvoice,
+                                    "emailinvoice" => $bi_emailinvoice,
 
-                                        "paymentmethod" => $bi_paymentmethod,
-                                        "cash" => $bi_cash,
-                                        "creditcardname" => $bi_creditcardname,
-                                        "creditcardnumber" => $bi_creditcardnumber,
-                                        "creditcardverification" => $bi_creditcardverification,
-                                        "creditcardtype" => $bi_creditcardtype,
-                                        "creditcardexp" => $bi_creditcardexp,
+                                    "paymentmethod" => $bi_paymentmethod,
+                                    "cash" => $bi_cash,
+                                    "creditcardname" => $bi_creditcardname,
+                                    "creditcardnumber" => $bi_creditcardnumber,
+                                    "creditcardverification" => $bi_creditcardverification,
+                                    "creditcardtype" => $bi_creditcardtype,
+                                    "creditcardexp" => $bi_creditcardexp,
 
-                                        "lead" => $bi_lead,
-                                        "coupon" => $bi_coupon,
-                                        "ordertaker" => $bi_ordertaker,
+                                    "lead" => $bi_lead,
+                                    "coupon" => $bi_coupon,
+                                    "ordertaker" => $bi_ordertaker,
 
-                                        "notes" => $bi_notes,
-                                        "changeuserbillinfo" => $bi_changeuserbillinfo,
+                                    "notes" => $bi_notes,
+                                    "changeuserbillinfo" => $bi_changeuserbillinfo,
 
-                                        //~ "billstatus" => $bi_billstatus,
-                                        //~ "lastbill" => $bi_lastbill,
-                                        //~ "nextbill" => $bi_nextbill,
-                                        "billdue" => $bi_billdue,
-                                        "nextinvoicedue" => $bi_nextinvoicedue,
+                                    //~ "billstatus" => $bi_billstatus,
+                                    //~ "lastbill" => $bi_lastbill,
+                                    //~ "nextbill" => $bi_nextbill,
+                                    "billdue" => $bi_billdue,
+                                    "nextinvoicedue" => $bi_nextinvoicedue,
 
-                                        "creationdate" => $current_datetime,
-                                        "creationby" => $currBy,
-                                   );
+                                    "creationdate" => $current_datetime,
+                                    "creationby" => $currBy,
+                               );
 
-                    if ($billinfoExist) {
-                        $params["planName"] = $planName;
-                        $params["updatedate"] = $current_datetime;
-                        $params["updateby"] = $currBy;
-                        $addedBillinfo = (update_user_billing_info($dbSocket, $username, $params)) ? "stored" : "nothing to store";
-                    } else {
-                        $params["creationdate"] = $current_datetime;
-                        $params["creationby"] = $currBy;
-                        $addedBillinfo = (add_user_billing_info($dbSocket, $username, $params)) ? "updated" : "nothing to update";
-                    }
+                if ($billinfoExist) {
+                    $params["planName"] = $planName;
+                    $params["updatedate"] = $current_datetime;
+                    $params["updateby"] = $currBy;
+                    $addedBillinfo = (update_user_billing_info($dbSocket, $username, $params)) ? "stored" : "nothing to store";
                 } else {
-                    $addedBillinfo = "not updated (insufficient billing permissions)";
+                    $params["creationdate"] = $current_datetime;
+                    $params["creationby"] = $currBy;
+                    $addedBillinfo = (add_user_billing_info($dbSocket, $username, $params)) ? "updated" : "nothing to update";
                 }
 
                 // update group mappings
@@ -460,7 +376,7 @@
                 $successMsg = sprintf("Successfully updated user <strong>%s</strong>", $username_enc);
                 $logAction .= sprintf("Successfully updated user %s on page: ", $username);
 
-            } elseif (empty($username)) {
+            } else { // if username != ""
                 $failureMsg = "You have specified an empty or invalid username";
                 $logAction .= "empty or invalid username on page: ";
             }
@@ -484,8 +400,7 @@
                        $configValues['CONFIG_DB_TBL_RADCHECK'], $dbSocket->escapeSimple($username));
         $res = $dbSocket->query($sql);
         $logDebugSQL .= "$sql;\n";
-        $row = $res->fetchRow();
-        $user_password = ($row) ? $row[0] : "";
+        $user_password = $res->fetchRow()[0];
 
         /* fill-in all the user info details */
         $sql = sprintf("SELECT firstname, lastname, email, department, company, workphone, homephone, mobilephone, address, city,
@@ -504,66 +419,29 @@
             ) = $res->fetchRow();
 
         /* fill-in all the user bill info details */
-        if ($hasBillingAccess) {
-            $sql = sprintf("SELECT planName, contactperson, company, email, phone, address, city, state, country, zip, paymentmethod,
-                                   cash, creditcardname, creditcardnumber, creditcardverification, creditcardtype, creditcardexp,
-                                   notes, changeuserbillinfo, `lead`, coupon, ordertaker, billstatus, lastbill, nextbill,
-                                   nextinvoicedue, billdue, postalinvoice, faxinvoice, emailinvoice, creationdate, creationby,
-                                   updatedate, updateby
-                              FROM %s WHERE username='%s'", $configValues['CONFIG_DB_TBL_DALOUSERBILLINFO'],
-                                                            $dbSocket->escapeSimple($username));
-            $res = $dbSocket->query($sql);
-            $logDebugSQL .= "$sql;\n";
+        $sql = sprintf("SELECT planName, contactperson, company, email, phone, address, city, state, country, zip, paymentmethod,
+                               cash, creditcardname, creditcardnumber, creditcardverification, creditcardtype, creditcardexp,
+                               notes, changeuserbillinfo, `lead`, coupon, ordertaker, billstatus, lastbill, nextbill,
+                               nextinvoicedue, billdue, postalinvoice, faxinvoice, emailinvoice, creationdate, creationby,
+                               updatedate, updateby
+                          FROM %s WHERE username='%s'", $configValues['CONFIG_DB_TBL_DALOUSERBILLINFO'],
+                                                        $dbSocket->escapeSimple($username));
+        $res = $dbSocket->query($sql);
+        $logDebugSQL .= "$sql;\n";
 
-            list(
-                    $bi_planname, $bi_contactperson, $bi_company, $bi_email, $bi_phone, $bi_address, $bi_city, $bi_state,
-                    $bi_country, $bi_zip, $bi_paymentmethod, $bi_cash, $bi_creditcardname, $bi_creditcardnumber,
-                    $bi_creditcardverification, $bi_creditcardtype, $bi_creditcardexp, $bi_notes, $bi_changeuserbillinfo,
-                    $bi_lead, $bi_coupon, $bi_ordertaker, $bi_billstatus, $bi_lastbill, $bi_nextbill, $bi_nextinvoicedue,
-                    $bi_billdue, $bi_postalinvoice, $bi_faxinvoice, $bi_emailinvoice, $bi_creationdate, $bi_creationby,
-                    $bi_updatedate, $bi_updateby
-                ) = $res->fetchRow();
-        } else {
-            $bi_planname = "";
-            $bi_contactperson = "";
-            $bi_company = "";
-            $bi_email = "";
-            $bi_phone = "";
-            $bi_address = "";
-            $bi_city = "";
-            $bi_state = "";
-            $bi_country = "";
-            $bi_zip = "";
-            $bi_paymentmethod = "";
-            $bi_cash = "";
-            $bi_creditcardname = "";
-            $bi_creditcardnumber = "";
-            $bi_creditcardverification = "";
-            $bi_creditcardtype = "";
-            $bi_creditcardexp = "";
-            $bi_notes = "";
-            $bi_changeuserbillinfo = "0";
-            $bi_lead = "";
-            $bi_coupon = "";
-            $bi_ordertaker = "";
-            $bi_billstatus = "";
-            $bi_lastbill = "";
-            $bi_nextbill = "";
-            $bi_nextinvoicedue = "";
-            $bi_billdue = "";
-            $bi_postalinvoice = "";
-            $bi_faxinvoice = "";
-            $bi_emailinvoice = "";
-            $bi_creationdate = "";
-            $bi_creationby = "";
-            $bi_updatedate = "";
-            $bi_updateby = "";
-        }
+        list(
+                $bi_planname, $bi_contactperson, $bi_company, $bi_email, $bi_phone, $bi_address, $bi_city, $bi_state,
+                $bi_country, $bi_zip, $bi_paymentmethod, $bi_cash, $bi_creditcardname, $bi_creditcardnumber,
+                $bi_creditcardverification, $bi_creditcardtype, $bi_creditcardexp, $bi_notes, $bi_changeuserbillinfo,
+                $bi_lead, $bi_coupon, $bi_ordertaker, $bi_billstatus, $bi_lastbill, $bi_nextbill, $bi_nextinvoicedue,
+                $bi_billdue, $bi_postalinvoice, $bi_faxinvoice, $bi_emailinvoice, $bi_creationdate, $bi_creationby,
+                $bi_updatedate, $bi_updateby
+            ) = $res->fetchRow();
 
         // inline extra javascript
         // Fix #1: XSS Prevention - Use json_encode for JavaScript string context
         // htmlspecialchars() does NOT properly escape JavaScript strings - only json_encode() works
-        $inline_extra_js = sprintf("var strUsername = 'username=%s';\n", rawurlencode($username));
+        $inline_extra_js = sprintf("var strUsername = 'username=%s';\n", json_encode($username));
 
         $inline_extra_js .= '
 function disableUser() {
@@ -578,23 +456,14 @@ function enableUser() {
         ajaxGeneric("library/ajax/user_actions.php", "userEnable=true", "returnMessages", strUsername);
         return true;
     }
-}
-
-function toggleSecretInput(button) {
-    var targetId = button.getAttribute("data-target");
-    var input = document.getElementById(targetId);
-
-    if (!input) {
-        return;
-    }
-
-    var showingSecret = input.type === "text";
-    input.type = showingSecret ? "password" : "text";
-    button.textContent = showingSecret ? button.getAttribute("data-reveal-text") : button.getAttribute("data-hide-text");
 }' . "\n";
     }
 
     include('../common/includes/db_close.php');
+
+    $hiddenPassword = (strtolower($configValues['CONFIG_IFACE_PASSWORD_HIDDEN']) == "yes")
+                    ? 'password' : 'text';
+
 
     // print HTML prologue
     $extra_css = array();
@@ -659,6 +528,16 @@ function toggleSecretInput(button) {
                                         "tooltipText" => t('Tooltip','usernameTooltip')
                                       );
 
+        $input_descriptors0[] = array(
+                                        "id" => "password",
+                                        "name" => "password",
+                                        "caption" => t('all','Password'),
+                                        "type" => $hiddenPassword,
+                                        "value" => ((isset($user_password)) ? $user_password : ""),
+                                        "disabled" => true,
+                                        "tooltipText" => t('Tooltip','passwordTooltip')
+                                     );
+
         $input_descriptors0[] = array( 'name' => 'oldplanName', 'type' => 'hidden',
                                                  'value' => ((isset($bi_planname)) ? $bi_planname : "") );
 
@@ -701,20 +580,6 @@ function toggleSecretInput(button) {
         foreach ($input_descriptors0 as $input_descriptor) {
             print_form_component($input_descriptor);
         }
-
-        $password_caption = htmlspecialchars(t('all','Password'), ENT_QUOTES, 'UTF-8');
-        $password_value = (isset($user_password)) ? htmlspecialchars($user_password, ENT_QUOTES, 'UTF-8') : "";
-        $password_help = htmlspecialchars(t('Tooltip','passwordTooltip'), ENT_QUOTES, 'UTF-8');
-        echo <<<EOF
-        <div class="mb-3">
-            <label for="password" class="form-label mx-1 mb-1">{$password_caption}</label>
-            <div class="input-group">
-                <input class="form-control" id="password" type="password" value="{$password_value}" disabled aria-describedby="password-help">
-                <button class="btn btn-outline-secondary" type="button" data-target="password" data-reveal-text="Reveal" data-hide-text="Hide" onclick="toggleSecretInput(this)">Reveal</button>
-            </div>
-            <div id="password-help" class="form-text">{$password_help}</div>
-        </div>
-EOF;
 
         close_fieldset();
 
@@ -806,14 +671,18 @@ EOF;
                 $id = $row[5];
                 $id__attribute = sprintf('%s__%s', $id, $row[0]);
                 $name = sprintf('editValues%s[]', $id);
-                $type = (preg_match("/-Password$/", $row[0])) ? "password" : "text";
+                $type = (preg_match("/-Password$/", $row[0])) ? $hiddenPassword : "text";
                 $onclick = sprintf("document.getElementById('form-%d-radcheck').submit()", $id);
+                
+                // Fix #2: Password Masking - Mask RADIUS password display
+                $displayValue = $row[2];
+                if (preg_match("/-Password$/", $row[0]) && !empty($displayValue)) {
+                    $displayValue = str_repeat("•", min(9, strlen($displayValue)));
+                }
 
                 $descriptor = array( 'onclick' => $onclick, 'attribute' => $row[0], 'select_name' => $name, 'selected_option' => $row[1],
-                                     'id__attribute' => $id__attribute, 'type' => $type, 'value' => $row[2], 'name' => $name,
-                                     'attr_type' => $row[3], 'attr_desc' => $row[4], 'table' => 'radcheck',
-                                     'id' => sprintf('radcheck-secret-%d', $id),
-                                     'revealToggle' => ($type === "password"));
+                                     'id__attribute' => $id__attribute, 'type' => $type, 'value' => $displayValue, 'name' => $name,
+                                     'attr_type' => $row[3], 'attr_desc' => $row[4], 'table' => 'radcheck');
 
                 print_edit_attribute($descriptor);
             }
@@ -858,14 +727,12 @@ EOF;
                 $id = $row[5];
                 $id__attribute = sprintf('%s__%s', $id, $row[0]);
                 $name = sprintf('editValues%s[]', $id);
-                $type = (preg_match("/-Password$/", $row[0])) ? "password" : "text";
+                $type = (preg_match("/-Password$/", $row[0])) ? $hiddenPassword : "text";
                 $onclick = sprintf("document.getElementById('form-%d-radreply').submit()", $id);
 
                 $descriptor = array( 'onclick' => $onclick, 'attribute' => $row[0], 'select_name' => $name, 'selected_option' => $row[1],
                                      'id__attribute' => $id__attribute, 'type' => $type, 'value' => $row[2], 'name' => $name,
-                                     'attr_type' => $row[3], 'attr_desc' => $row[4], 'table' => 'radreply',
-                                     'id' => sprintf('radreply-secret-%d', $id),
-                                     'revealToggle' => ($type === "password"));
+                                     'attr_type' => $row[3], 'attr_desc' => $row[4], 'table' => 'radreply');
 
                 print_edit_attribute($descriptor);
             }
@@ -875,46 +742,6 @@ EOF;
         }
 
         echo '</div><!-- .container -->';
-
-        // Add New Reply Attribute Form
-        echo '<div class="card mt-3" style="background-color: #f8f9fa; border: 1px solid #dee2e6;">';
-        echo '<div class="card-body">';
-        echo '<h5 class="card-title">Add New Reply Attribute</h5>';
-        echo '<div class="form-inline">';
-        
-        echo '<div class="form-group mr-2">';
-        echo '<label for="replyAttrName" class="mr-2">Attribute:</label>';
-        echo '<select id="replyAttrName" class="form-control form-control-sm">';
-        echo '<option value="">-- Select Attribute --</option>';
-        echo '<option value="Tunnel-Password">Tunnel-Password</option>';
-        echo '<option value="Session-Timeout">Session-Timeout</option>';
-        echo '<option value="Idle-Timeout">Idle-Timeout</option>';
-        echo '<option value="Framed-IP-Address">Framed-IP-Address</option>';
-        echo '<option value="Reply-Message">Reply-Message</option>';
-        echo '<option value="Acct-Interim-Interval">Acct-Interim-Interval</option>';
-        echo '<option value="Tunnel-Type">Tunnel-Type</option>';
-        echo '<option value="Tunnel-Medium-Type">Tunnel-Medium-Type</option>';
-        echo '</select>';
-        echo '</div>';
-        
-        echo '<div class="form-group mr-2">';
-        echo '<label for="replyAttrOp" class="mr-2">Operator:</label>';
-        echo '<select id="replyAttrOp" class="form-control form-control-sm">';
-        echo '<option value="=" selected>=</option>';
-        echo '<option value=":=">:=</option>';
-        echo '<option value="+=">+=</option>';
-        echo '</select>';
-        echo '</div>';
-        
-        echo '<div class="form-group mr-2" style="flex: 1;">';
-        echo '<label for="replyAttrValue" class="mr-2">Value:</label>';
-        echo '<input type="text" id="replyAttrValue" class="form-control form-control-sm" placeholder="Enter value">';
-        echo '</div>';
-        
-        echo '<button type="button" class="btn btn-sm btn-primary" onclick="return submitReplyAttributeForm()">Add Attribute</button>';
-        echo '</div>';
-        echo '</div>';
-        echo '</div>';
 
         close_fieldset();
 
@@ -928,11 +755,7 @@ EOF;
 
         // open 4-th tab (not shown)
         open_tab($navkeys, 4);
-        if ($hasBillingAccess) {
-            include_once('include/management/userbillinfo.php');
-        } else {
-            echo '<div class="alert alert-warning" role="alert">You do not have permission to view or edit billing information.</div>';
-        }
+        include_once('include/management/userbillinfo.php');
         close_tab($navkeys, 4);
 
         // open 5-th tab (not shown)
@@ -968,16 +791,6 @@ EOF;
         print_form_component($submit_descriptor);
 
         close_form();
-
-        printf('<form id="replyAttrAddForm" method="POST" action="mng-edit.php" style="display: none">'
-             . '<input type="hidden" name="csrf_token" value="%s">'
-             . '<input type="hidden" name="username" value="%s">'
-             . '<input type="hidden" name="is_add_reply_attribute_request" value="1">'
-             . '<input type="hidden" id="replyAttrAddName" name="reply_attribute_name" value="">'
-             . '<input type="hidden" id="replyAttrAddOp" name="reply_attribute_op" value="">'
-             . '<input type="hidden" id="replyAttrAddValue" name="reply_attribute_value" value="">'
-             . '</form>',
-               $csrf_token, $username_enc);
 
         // print forms
         include('../common/includes/db_open.php');
@@ -1017,44 +830,9 @@ EOF;
 
         $inline_extra_js = <<<EOF
 
-function submitReplyAttributeForm() {
-    var nameEl = document.getElementById('replyAttrName'),
-        opEl = document.getElementById('replyAttrOp'),
-        valueEl = document.getElementById('replyAttrValue');
-
-    if (!nameEl || !opEl || !valueEl) {
-        return false;
-    }
-
-    var attrName = (nameEl.value || '').trim(),
-        attrOp = (opEl.value || '').trim(),
-        attrValue = (valueEl.value || '').trim();
-
-    if (!attrName || !attrValue) {
-        alert('Attribute name and value are required');
-        return false;
-    }
-
-    document.getElementById('replyAttrAddName').value = attrName;
-    document.getElementById('replyAttrAddOp').value = attrOp;
-    document.getElementById('replyAttrAddValue').value = attrValue;
-    document.getElementById('replyAttrAddForm').submit();
-    return false;
-}
-
 window.onload = function() {
     setupAccordion();
     ajaxGeneric("library/ajax/user_actions.php", "checkDisabled=true", "returnMessages", strUsername);
-
-    var replyValueEl = document.getElementById('replyAttrValue');
-    if (replyValueEl) {
-        replyValueEl.addEventListener('keydown', function(evt) {
-            if (evt.key === 'Enter') {
-                evt.preventDefault();
-                submitReplyAttributeForm();
-            }
-        });
-    }
 };
 
 EOF;
@@ -1066,3 +844,5 @@ EOF;
     include('include/config/logging.php');
 
     print_footer_and_html_epilogue($inline_extra_js);
+
+?>

@@ -242,8 +242,7 @@
             $badge = sprintf('<i class="bi bi-%s me-1" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-title="%s"></i>',
                              $badge_icon, strtolower($type));
             
-            $auth = (strtolower($configValues['CONFIG_IFACE_PASSWORD_HIDDEN']) === "yes")
-                  ? "[Password is hidden]" : $value;
+            $auth = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
             
             $ajax_id = "divContainerUserInfo_" . $count;
             $param = sprintf('username=%s', urlencode($username));
@@ -264,7 +263,8 @@
             $checkbox = get_checkbox_str($d);
             
             // define table row
-            $table_row = array( $checkbox, $contactperson, $company, $tooltip, $auth, $planname);
+            $secret_id = sprintf('bill-pos-auth-secret-%d', $count);
+            $table_row = array( $checkbox, $contactperson, $company, $tooltip, get_masked_secret_str($secret_id, $auth), $planname);
 
             // print table row
             print_table_row($table_row);

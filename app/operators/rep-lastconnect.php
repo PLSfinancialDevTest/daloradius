@@ -67,8 +67,6 @@
               ? str_replace("%", "", trim($_GET['username'])) : "";
     $username_enc = (!empty($username)) ? htmlspecialchars($username, ENT_QUOTES, 'UTF-8') : "";
 
-    $hiddenPassword = (strtolower($configValues['CONFIG_IFACE_PASSWORD_HIDDEN']) == "yes");
-
     // the array $cols has multiple purposes:
     // - its keys (when non-numerical) can be used
     //   - for validating user input
@@ -79,9 +77,7 @@
                    $tableSetting['postauth']['user'] => t('all','Username'),
                  );
 
-    if (!$hiddenPassword) {
-        $cols["pass"] = t('all','Password');
-    }
+    $cols["pass"] = t('all','Password');
 
     if ($radiusReply == 'Any') {
         $cols["reply"] = t('all','RADIUSReply');
@@ -247,9 +243,8 @@
                              (($reply == "Access-Reject") ? "danger" : "success"), $reply);
 
             $table_row = array( $fullname, $user );
-            if (!$hiddenPassword) {
-                $table_row[] = $pass;
-            }
+            $secret_id = sprintf('lastconnect-pass-secret-%d', $count);
+            $table_row[] = get_masked_secret_str($secret_id, $pass);
 
             $table_row[] = $reply;
             $table_row[] = $datetime;

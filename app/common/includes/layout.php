@@ -33,6 +33,36 @@ function fix_placeholder_text($text) {
     return trim($text);
 }
 
+function get_masked_secret_str($id, $value, $mask='••••••••') {
+    $id = htmlspecialchars(trim($id), ENT_QUOTES, 'UTF-8');
+    $value = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+    $mask = htmlspecialchars($mask, ENT_QUOTES, 'UTF-8');
+
+    return sprintf(
+        '<div class="d-flex align-items-center gap-2"><span id="%1$s-masked">%2$s</span><span id="%1$s-value" class="d-none">%3$s</span><button class="btn btn-outline-secondary btn-sm" type="button" data-secret-id="%1$s" data-reveal-text="%4$s" data-hide-text="%5$s" onclick="toggleSecretText(this)">%4$s</button></div>',
+        $id,
+        $mask,
+        $value,
+        'Reveal',
+        'Hide'
+    );
+}
+
+function fix_form_text($text, $preserve_newlines=false) {
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = str_replace('"', "'", strip_tags($text));
+
+    if ($preserve_newlines) {
+        $text = preg_replace("/\r\n|\r/u", "\n", $text);
+        $text = preg_replace('/[ \t\f\xA0]+/u', ' ', $text);
+        $text = preg_replace("/\n{3,}/u", "\n\n", $text);
+        return trim($text);
+    }
+
+    $text = preg_replace('/[\s\h\v\xA0]+/u', ' ', $text);
+    return trim($text);
+}
+
 const DEFAULT_COMMON_PROLOGUE_CSS = array(
     "static/css/bootstrap.min.css",
     "static/css/icons/bootstrap-icons.min.css",
@@ -199,9 +229,37 @@ EOF;
 
 
     echo <<<EOF
-var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]')),
-    tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
+    function toggleSecretInput(button) {
+        var targetId = button.getAttribute("data-target");
+        var input = document.getElementById(targetId);
+
+        if (!input) {
+            return;
+        }
+
+        var showingSecret = input.type === "text";
+        input.type = showingSecret ? "password" : "text";
+        button.textContent = showingSecret ? button.getAttribute("data-reveal-text") : button.getAttribute("data-hide-text");
+    }
+
+    function toggleSecretText(button) {
+        var secretId = button.getAttribute('data-secret-id');
+        var maskedEl = document.getElementById(secretId + '-masked');
+        var valueEl = document.getElementById(secretId + '-value');
+
+        if (!maskedEl || !valueEl) {
+            return;
+        }
+
+        var showingValue = valueEl.classList.contains('d-none') === false;
+        valueEl.classList.toggle('d-none', showingValue);
+        maskedEl.classList.toggle('d-none', !showingValue);
+        button.textContent = showingValue ? button.getAttribute('data-reveal-text') : button.getAttribute('data-hide-text');
+    }
+
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]')),
+        tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
     });
 </script>
 
@@ -666,7 +724,9 @@ function print_input_field($input_descriptor) {
         printf('<label for="%s" class="%s mx-1 mb-1">%s</label>', $input_descriptor['id'], $class, $input_descriptor['caption']);
     }
 
-    if (array_key_exists('random', $input_descriptor) && $input_descriptor['random']) {
+    $show_reveal_toggle = array_key_exists('revealToggle', $input_descriptor) && $input_descriptor['revealToggle'] === true;
+
+    if ((array_key_exists('random', $input_descriptor) && $input_descriptor['random']) || $show_reveal_toggle) {
         echo '<div class="input-group">';
     }
 
@@ -818,8 +878,17 @@ function print_input_field($input_descriptor) {
         printf(' onclick="%s" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Random">', $onclick);
         echo '<i class="bi bi-shuffle"></i>'
            . '</button>'
-           . '</span>'
-           . '</div>';
+           . '</span>';
+ 
+    }
+
+    if ($show_reveal_toggle) {
+        printf('<button class="btn btn-outline-secondary" type="button" data-target="%s" data-reveal-text="%s" data-hide-text="%s" onclick="toggleSecretInput(this)">%s</button>',
+               $input_descriptor['id'], 'Reveal', 'Hide', 'Reveal');
+    }
+
+    if ((array_key_exists('random', $input_descriptor) && $input_descriptor['random']) || $show_reveal_toggle) {
+        echo '</div>';
 
     }
 
@@ -1091,7 +1160,23 @@ function print_edit_attribute($descriptor) {
 
     echo '<div class="flex-fill">';
     printf('<input type="hidden" name="%s" value="%s">', $descriptor['name'], $descriptor['id__attribute']);
-    printf('<input class="form-control" type="%s" value="%s" name="%s">', $descriptor['type'], $descriptor['value'], $descriptor['name']);
+
+    $input_id = (!empty($descriptor['id']))
+              ? $descriptor['id']
+              : sprintf('%s-%s', preg_replace('/[^A-Za-z0-9_-]/', '-', $descriptor['table']), intval($descriptor['id__attribute']));
+    $reveal_toggle = array_key_exists('revealToggle', $descriptor) && $descriptor['revealToggle'] === true;
+
+    if ($reveal_toggle) {
+        echo '<div class="input-group">';
+    }
+
+    printf('<input class="form-control" id="%s" type="%s" value="%s" name="%s">', $input_id, $descriptor['type'], $descriptor['value'], $descriptor['name']);
+
+    if ($reveal_toggle) {
+        printf('<button class="btn btn-outline-secondary" type="button" data-target="%s" data-reveal-text="%s" data-hide-text="%s" onclick="toggleSecretInput(this)">%s</button>',
+               $input_id, 'Reveal', 'Hide', 'Reveal');
+        echo '</div>';
+    }
     echo '</div>';
 
     echo '<div>';
@@ -1196,7 +1281,12 @@ function print_form_component($descriptor) {
         $tooltip_box_id = sprintf('%s-%d-tooltip', $descriptor['id'], rand());
         $describedby_id = $descriptor['id'] .  '-help';
 
-        $tooltipText = fix_placeholder_text($descriptor['tooltipText']);
+        $preserve_newlines = array_key_exists('preserveNewlines', $descriptor) && $descriptor['preserveNewlines'] === true;
+        $tooltipText = fix_form_text($descriptor['tooltipText'], $preserve_newlines);
+
+        if ($preserve_newlines) {
+            $tooltipText = nl2br(htmlspecialchars($tooltipText, ENT_QUOTES, 'UTF-8'));
+        }
 
         printf('<div id="%s" class="form-text">%s</div>', $describedby_id, $tooltipText);
     }

@@ -100,14 +100,19 @@
                         
                         if (!$groupname_is_set) {
                             // if user is set but groupname not we want to delete all groups
-                            if (check_usergroup_mapping($dbSocket, $u, $g)) {
+                            $sql = sprintf("SELECT groupname FROM %s WHERE username='%s'",
+                                           $configValues['CONFIG_DB_TBL_RADUSERGROUP'], $u);
+                            $res = $dbSocket->query($sql);
+                            $logDebugSQL .= "$sql;\n";
+
+                            if ($res->numRows() > 0) {
                                 $usergroup_mappings[$u] = array();
-                            
+
                                 while ($row = $res->fetchrow()) {
                                     $usergroup_mappings[$u][] = $dbSocket->escapeSimple($row[0]);
                                 }
                             }
-                            
+                             
                         } else {
                             $g = $dbSocket->escapeSimple(trim(str_replace("%", "", $_POST['group'])));
                             
@@ -128,15 +133,19 @@
        
             if (count($usergroup_mappings) > 0) {
                 foreach ($usergroup_mappings as $username => $groups) {
+                    if (count($groups) === 0) {
+                        continue;
+                    }
+
                     $sql = sprintf("DELETE FROM %s WHERE username='%s' AND groupname IN ('%s')",
                                    $configValues['CONFIG_DB_TBL_RADUSERGROUP'], $dbSocket->escapeSimple($username),
                                    implode("', '", $groups));
                     $res = $dbSocket->query($sql);
                     $logDebugSQL .= "$sql;\n";
                     
-                    if ($res > 0) {
+                    if (!DB::isError($res)) {
                         $count_involved_users++;
-                        $count_involved_groups += $res;
+                        $count_involved_groups += count($groups);
                     }
                 }
             }
