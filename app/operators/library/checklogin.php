@@ -35,9 +35,8 @@ include('sessions.php');
 dalo_session_start();
 
 /*
- * PLS Kerberos SSO bypass
+ * Kerberos SSO bypass
  * Apache mod_auth_gssapi authenticates the user and exposes REMOTE_USER.
- * Apache group authorization limits access to PLS-Store-Radius.
  */
 include_once('kerberos_sso.php');
 

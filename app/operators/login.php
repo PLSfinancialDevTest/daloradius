@@ -24,7 +24,7 @@
 include_once("library/sessions.php");
 dalo_session_start();
 /*
- * PLS Kerberos SSO bypass
+ * Kerberos SSO bypass
  * If Apache already authenticated the user, create the daloRADIUS session
  * and bypass the local login form.
  */

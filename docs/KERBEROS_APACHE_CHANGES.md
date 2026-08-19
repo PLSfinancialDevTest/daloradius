@@ -76,8 +76,8 @@ Add Kerberos auth to the operators path in your SSL vhost (`:443`):
         # Require successful Kerberos auth
         Require valid-user
 
-        # Optional AD group restriction (if using mod_authnz_ldap or equivalent authz integration):
-        # Require ldap-group CN=PLS-Store-Radius,OU=Groups,DC=plsfinancial,DC=com
+        # Optional directory group restriction (if using mod_authnz_ldap or equivalent authz integration):
+        # Require ldap-group CN=Radius-Operators,OU=Groups,DC=example,DC=com
     </Location>
 
     # Ensure PHP receives REMOTE_USER consistently
@@ -96,6 +96,8 @@ If you must support legacy clients, enable fallback intentionally and document r
 
 - `user@REALM` -> `user`
 - `DOMAIN\user` -> `user` (domain prefix stripped)
+
+It strips `DOMAIN\` using `CONFIG_SSO_WINDOWS_DOMAIN` from `daloradius.conf.php`.
 
 Therefore `dalooperators.username` must match normalized usernames.
 

@@ -72,6 +72,7 @@ $configValues['CONFIG_PATH_RADIUS_DICT'] = '';
 $configValues['CONFIG_PATH_DALO_VARIABLE_DATA'] = '/var/www/daloradius/var';
 $configValues['CONFIG_PATH_DALO_TEMPLATES_DIR'] = '/var/www/daloradius/app/common/templates';
 $configValues['CONFIG_DB_PASSWORD_ENCRYPTION'] = 'yes';
+$configValues['CONFIG_SSO_WINDOWS_DOMAIN'] = 'example';
 $configValues['CONFIG_LANG'] = 'en';
 $configValues['CONFIG_LOG_PAGES'] = 'no';
 $configValues['CONFIG_LOG_ACTIONS'] = 'no';

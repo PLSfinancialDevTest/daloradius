@@ -1,9 +1,8 @@
 <?php
 /*
- * PLS Kerberos SSO integration for daloRADIUS operators.
+ * Kerberos SSO integration for daloRADIUS operators.
  *
- * Apache mod_auth_gssapi authenticates the AD user and exposes REMOTE_USER.
- * Apache authorization restricts access to the AD group PLS-Store-Radius.
+ * Apache mod_auth_gssapi authenticates the directory user and exposes REMOTE_USER.
  *
  * This helper maps REMOTE_USER to daloRADIUS operators.username,
  * looks up operators.id, and populates the daloRADIUS session values
@@ -16,11 +15,16 @@ if (
 ) {
     $operatorUser = strtolower($_SERVER['REMOTE_USER']);
 
-    // Strip Kerberos realm if present, example: pfuller@PLSFINANCIAL.COM
+    // Strip Kerberos realm if present, example: user@EXAMPLE.COM
     $operatorUser = preg_replace('/@.*$/', '', $operatorUser);
 
-    // Strip Windows domain prefix if present, example: PLSFINANCIAL\pfuller
-    $operatorUser = preg_replace('/^plsfinancial\\\\/i', '', $operatorUser);
+    // Strip configured Windows domain prefix if present, example: EXAMPLE\user
+    $configuredDomain = (isset($configValues['CONFIG_SSO_WINDOWS_DOMAIN']) && !empty(trim($configValues['CONFIG_SSO_WINDOWS_DOMAIN'])))
+                      ? trim($configValues['CONFIG_SSO_WINDOWS_DOMAIN'])
+                      : '';
+    if ($configuredDomain !== '') {
+        $operatorUser = preg_replace('/^' . preg_quote($configuredDomain, '/') . '\\\\/i', '', $operatorUser);
+    }
 
     if ($operatorUser === '') {
         return;
