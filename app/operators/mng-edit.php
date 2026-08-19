@@ -45,47 +45,36 @@
 
     /**
      * Fix #4: Permission Checks for Sensitive Data
-     * Check if operator has permission to access billing information
-     * Required for: credit card, payment status, billing limits
+     * Check if operator has permission to access billing information.
+     * Billing authorization in daloRADIUS is ACL-based, not stored on the
+     * operators record itself.
      * 
      * @param $operatorId Operator ID to check
      * @return bool True if operator has billing permission, false otherwise
      */
     function checkOperatorBillingAccess($operatorId) {
         global $dbSocket, $configValues;
-        
-        // Use proper config constant for operators table
-        $query = sprintf("SELECT realm, permissions FROM %s WHERE id='%s' LIMIT 1",
-                        $configValues['CONFIG_DB_TBL_DALOOPERATORS'],
-                        $dbSocket->escapeSimple($operatorId));
-        
-        $result = $dbSocket->query($query);
-        
-        // Check for database errors
+
+        if (!is_numeric($operatorId)) {
+            return false;
+        }
+
+        $query = sprintf(
+            "SELECT COUNT(*) FROM %s AS acl "
+            . "INNER JOIN %s AS acl_files ON acl.file = acl_files.file "
+            . "WHERE acl.operator_id=%d AND acl.access=1 AND acl_files.category='Billing'",
+            $configValues['CONFIG_DB_TBL_DALOOPERATORS_ACL'],
+            $configValues['CONFIG_DB_TBL_DALOOPERATORS_ACL_FILES'],
+            intval($operatorId)
+        );
+
+        $result = $dbSocket->getOne($query);
+
         if (DB::isError($result)) {
-            return false; // Deny access on error for security
+            return false;
         }
-        
-        if ($result->numRows() === 0) {
-            return false; // Operator not found
-        }
-        
-        $row = $result->fetchRow();
-        
-        // Check if operator is admin (skip check for admins)
-        if (!empty($row) && isset($row['realm']) && $row['realm'] === 'admin') {
-            return true;
-        }
-        
-        // Check for explicit billing permission in permissions field
-        if (!empty($row) && isset($row['permissions']) && !empty($row['permissions'])) {
-            // Handle both comma-separated and semicolon-separated permissions
-            if (preg_match('/billing/i', $row['permissions'])) {
-                return true;
-            }
-        }
-        
-        return false; // No billing permission found
+
+        return intval($result) > 0;
     }
 
     $hasBillingAccess = checkOperatorBillingAccess($_SESSION['operator_id'] ?? '');
