@@ -37,9 +37,12 @@
     $logAction = "";
     $logDebugSQL = "";
 
-    // Store password in plaintext: Always allow Cleartext-Password
-    // Passwords are stored as Cleartext-Password in radcheck table
-    // This is required for RADIUS authentication
+    // if cleartext passwords are not allowed,
+    // we remove Cleartext-Password from the $valid_passwordTypes array
+    if (isset($configValues['CONFIG_DB_PASSWORD_ENCRYPTION']) &&
+        strtolower(trim($configValues['CONFIG_DB_PASSWORD_ENCRYPTION'])) !== 'yes') {
+        $valid_passwordTypes = array_values(array_diff($valid_passwordTypes, array("Cleartext-Password")));
+    }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (array_key_exists('csrf_token', $_POST) && isset($_POST['csrf_token']) && dalo_check_csrf_token($_POST['csrf_token'])) {
@@ -57,7 +60,8 @@
             // replace: $\1 = (array_key_exists('\2', $_POST) && isset($_POST['\2'])) ? $_POST['\2'] : "";
 
             $password = (array_key_exists('password', $_POST) && isset($_POST['password'])) ? trim($_POST['password']) : "";
-            $passwordType = "Cleartext-Password";
+            $passwordType = (array_key_exists('passwordType', $_POST) && isset($_POST['passwordType']) &&
+                             in_array($_POST['passwordType'], $valid_passwordTypes)) ? $_POST['passwordType'] : "";
             $groups = (array_key_exists('groups', $_POST) && isset($_POST['groups'])) ? $_POST['groups'] : array();
             $maxallsession = (array_key_exists('maxallsession', $_POST) && isset($_POST['maxallsession'])) ? $_POST['maxallsession'] : "";
             $expiration = (array_key_exists('expiration', $_POST) && isset($_POST['expiration'])) ? $_POST['expiration'] : "";

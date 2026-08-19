@@ -37,9 +37,12 @@
     $logAction = "";
     $logDebugSQL = "";
 
-    // Store password in plaintext: Always allow Cleartext-Password
-    // Passwords are stored as Cleartext-Password in radcheck table
-    // This is required for RADIUS authentication
+    // if cleartext passwords are not allowed,
+    // we remove Cleartext-Password from the $valid_passwordTypes array
+    if (isset($configValues['CONFIG_DB_PASSWORD_ENCRYPTION']) &&
+        strtolower(trim($configValues['CONFIG_DB_PASSWORD_ENCRYPTION'])) !== 'yes') {
+        $valid_passwordTypes = array_values(array_diff($valid_passwordTypes, array("Cleartext-Password")));
+    }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (array_key_exists('csrf_token', $_POST) && isset($_POST['csrf_token']) && dalo_check_csrf_token($_POST['csrf_token'])) {
@@ -58,7 +61,8 @@
 
             $password = (array_key_exists('password', $_POST) && isset($_POST['password'])) ? $_POST['password'] : "";
 
-            $passwordType = "Cleartext-Password";
+            $passwordType = (array_key_exists('passwordType', $_POST) && !empty(trim($_POST['passwordType'])) &&
+                             in_array(trim($_POST['passwordType']), $valid_passwordTypes)) ? trim($_POST['passwordType']) : $valid_passwordTypes[0];
 
             $macaddress = (isset($_POST['macaddress']) && !empty(trim($_POST['macaddress'])) &&
                            preg_match(MACADDR_REGEX, trim($_POST['macaddress']))) ? trim($_POST['macaddress']) : "";
