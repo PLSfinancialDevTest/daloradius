@@ -56,17 +56,7 @@ postauth_query = "INSERT INTO __POSTAUTH_TABLE__ (username, pass, reply, authdat
 EOF
 
 read -r -d '' BLOCK_QUERY <<'EOF' || true
-INSERT INTO __POSTAUTH_TABLE_DOT__ \\
-            (username, pass, reply, authdate, nasipaddress, calledstationid, nasidentifier __CLASS_COL__) \\
-        VALUES ( \\
-            '%{SQL-User-Name}', \\
-            '%{%{User-Password}:-%{Chap-Password}}', \\
-            '%{reply:Packet-Type}', \\
-            '__TS_FMT__', \\
-            '%{%{NAS-IP-Address}:-}', \\
-            '%{%{Called-Station-Id}:-}', \\
-            '%{%{NAS-Identifier}:-}' \\
-            __CLASS_REPLY__)
+INSERT INTO __POSTAUTH_TABLE_DOT__ (username, pass, reply, authdate, nasipaddress, calledstationid, nasidentifier __CLASS_COL__) VALUES ('%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', '__TS_FMT__', '%{%{NAS-IP-Address}:-}', '%{%{Called-Station-Id}:-}', '%{%{NAS-Identifier}:-}' __CLASS_REPLY__)
 EOF
 
 BLOCK_QUERY="${BLOCK_QUERY/__TS_FMT__/${TS_FMT}}"
