@@ -26,6 +26,10 @@ If you encounter any issues during the installation or have any questions, feel 
 
 The documentation for daloRADIUS is available in Markdown format and can be found in the `doc` folder of this repository.
 
+For Last Connection Attempts NAS resolution based on FreeRADIUS post-auth metadata, see [doc/setup/radpostauth-nas-logging.md](doc/setup/radpostauth-nas-logging.md).
+
+Automation helper script for patching `queries.conf` on FreeRADIUS nodes is available at `contrib/scripts/maintenance/update-freeradius-postauth-query.sh`.
+
 For Docker usage, including the Compose stack and standalone web image, see [README.docker-standalone.md](README.docker-standalone.md).
 
 ## Contributors

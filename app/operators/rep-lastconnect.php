@@ -77,6 +77,8 @@
                    $tableSetting['postauth']['user'] => t('all','Username'),
                  );
 
+        $cols["ap"] = t('all','NasShortname');
+
     $cols["pass"] = t('all','Password');
 
     if ($radiusReply == 'Any') {
@@ -123,6 +125,81 @@
     include('include/management/pages_common.php');
     include('../common/includes/db_open.php');
 
+    $postauth_columns = array();
+    $postauth_cols_res = $dbSocket->query(sprintf("SHOW COLUMNS FROM %s", $configValues['CONFIG_DB_TBL_RADPOSTAUTH']));
+    if (!DB::isError($postauth_cols_res)) {
+        while ($col = $postauth_cols_res->fetchRow()) {
+            $postauth_columns[] = $col[0];
+        }
+    }
+
+    $ap_parts = array();
+    if (in_array('ap', $postauth_columns)) {
+        $ap_parts[] = "NULLIF(pa.ap, '')";
+    }
+    if (in_array('nasidentifier', $postauth_columns)) {
+        $ap_parts[] = "NULLIF(pa.nasidentifier, '')";
+    }
+    if (in_array('nasipaddress', $postauth_columns)) {
+        $ap_parts[] = sprintf("(SELECT n.shortname FROM %s AS n WHERE n.nasname = pa.nasipaddress ORDER BY n.id DESC LIMIT 1)",
+                              $configValues['CONFIG_DB_TBL_RADNAS']);
+        $ap_parts[] = "NULLIF(pa.nasipaddress, '')";
+    }
+    if (in_array('calledstationid', $postauth_columns)) {
+        $ap_parts[] = "NULLIF(pa.calledstationid, '')";
+    }
+
+    $ap_parts[] = sprintf("(SELECT n.shortname"
+                        . " FROM %s AS ra"
+                        . " LEFT JOIN %s AS n ON n.nasname = ra.nasipaddress"
+                        . " WHERE ra.username = pa.%s"
+                        . " ORDER BY ra.acctupdatetime DESC LIMIT 1)",
+                        $configValues['CONFIG_DB_TBL_RADACCT'],
+                        $configValues['CONFIG_DB_TBL_RADNAS'],
+                        $tableSetting['postauth']['user']);
+    $ap_parts[] = sprintf("(SELECT ra.nasipaddress"
+                        . " FROM %s AS ra"
+                        . " WHERE ra.username = pa.%s"
+                        . " ORDER BY ra.acctupdatetime DESC LIMIT 1)",
+                        $configValues['CONFIG_DB_TBL_RADACCT'],
+                        $tableSetting['postauth']['user']);
+    $ap_parts[] = sprintf("(SELECT n.shortname"
+                        . " FROM %s AS n"
+                        . " WHERE n.shortname LIKE CONCAT(SUBSTRING_INDEX(ui.firstname, ' ', 1), '%%')"
+                        . " ORDER BY n.id DESC LIMIT 1)",
+                        $configValues['CONFIG_DB_TBL_RADNAS']);
+    $ap_parts[] = sprintf("(SELECT n.nasname"
+                        . " FROM %s AS n"
+                        . " WHERE n.shortname LIKE CONCAT(SUBSTRING_INDEX(ui.firstname, ' ', 1), '%%')"
+                        . " ORDER BY n.id DESC LIMIT 1)",
+                        $configValues['CONFIG_DB_TBL_RADNAS']);
+    $ap_parts[] = sprintf("(SELECT n.shortname"
+                        . " FROM %s AS n"
+                        . " WHERE n.shortname LIKE CONCAT('%%', (SELECT UPPER(SUBSTRING(rr.value, LOCATE('cc', LOWER(rr.value)), 5))"
+                        . " FROM %s AS rr"
+                        . " WHERE rr.username = pa.%s"
+                        . " AND rr.attribute = 'Tunnel-Password'"
+                        . " AND LOCATE('cc', LOWER(rr.value)) > 0"
+                        . " ORDER BY rr.id DESC LIMIT 1), '%%')"
+                        . " ORDER BY n.id DESC LIMIT 1)",
+                        $configValues['CONFIG_DB_TBL_RADNAS'],
+                        $configValues['CONFIG_DB_TBL_RADREPLY'],
+                        $tableSetting['postauth']['user']);
+    $ap_parts[] = sprintf("(SELECT n.nasname"
+                        . " FROM %s AS n"
+                        . " WHERE n.shortname LIKE CONCAT('%%', (SELECT UPPER(SUBSTRING(rr.value, LOCATE('cc', LOWER(rr.value)), 5))"
+                        . " FROM %s AS rr"
+                        . " WHERE rr.username = pa.%s"
+                        . " AND rr.attribute = 'Tunnel-Password'"
+                        . " AND LOCATE('cc', LOWER(rr.value)) > 0"
+                        . " ORDER BY rr.id DESC LIMIT 1), '%%')"
+                        . " ORDER BY n.id DESC LIMIT 1)",
+                        $configValues['CONFIG_DB_TBL_RADNAS'],
+                        $configValues['CONFIG_DB_TBL_RADREPLY'],
+                        $tableSetting['postauth']['user']);
+
+    $ap_select = "COALESCE(" . implode(", ", $ap_parts) . ", '(n/a)') AS ap";
+
     // pa is a placeholder in the SQL statements below
     // except for $username, which has been only partially escaped,
     // all other query parameters have been validated earlier.
@@ -147,10 +224,11 @@
     $_SESSION['reportType'] = "reportsLastConnectionAttempts";
 
 
-    $sql = sprintf("SELECT CONCAT(COALESCE(ui.firstname, ''), ' ', COALESCE(ui.lastname, '')) AS fullname,
-                           pa.%s AS username, pa.pass, pa.reply, pa.%s
-                      FROM %s %s", $tableSetting['postauth']['user'], $tableSetting['postauth']['date'],
-                                   $_SESSION['reportTable'], $_SESSION['reportQuery']);
+        $sql = sprintf("SELECT CONCAT(COALESCE(ui.firstname, ''), ' ', COALESCE(ui.lastname, '')) AS fullname,
+                          pa.%s AS username, %s, pa.pass, pa.reply, pa.%s
+                      FROM %s %s", $tableSetting['postauth']['user'], $ap_select,
+                                $tableSetting['postauth']['date'], $_SESSION['reportTable'],
+                                $_SESSION['reportQuery']);
 
     $res = $dbSocket->query($sql);
     $numrows = $res->numRows();
@@ -232,17 +310,17 @@
             }
 
             // The table that is being produced is in the format of:
-            // +-------------+-------------+---------------+-----------+-----------+
-            // | fullname    | user        | pass (opt.)   | reply     | date      |
-            // +-------------+-------------+---------------+-----------+-----------+
+            // +-------------+-------------+---------------+---------------+-----------+-----------+
+            // | fullname    | user        | nas shortname | pass (opt.)    | reply     | date      |
+            // +-------------+-------------+---------------+---------------+-----------+-----------+
 
-            list($fullname, $user, $pass, $reply, $datetime) = $row;
+            list($fullname, $user, $ap, $pass, $reply, $datetime) = $row;
 
             $fullname = (!empty($fullname) ? $fullname : "(n/a)");
             $reply = sprintf('<span class="text-%s">%s</span>',
                              (($reply == "Access-Reject") ? "danger" : "success"), $reply);
 
-            $table_row = array( $fullname, $user );
+            $table_row = array( $fullname, $user, $ap );
             $secret_id = sprintf('lastconnect-pass-secret-%d', $count);
             $table_row[] = get_masked_secret_str($secret_id, $pass);
 

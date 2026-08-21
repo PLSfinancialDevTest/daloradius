@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+QCONF="${1:-}"
+
+if [[ -z "${QCONF}" ]]; then
+    if [[ -f "/etc/freeradius/3.0/mods-config/sql/main/mysql/queries.conf" ]]; then
+        QCONF="/etc/freeradius/3.0/mods-config/sql/main/mysql/queries.conf"
+    else
+        QCONF="$(find /etc/freeradius -type f -name queries.conf 2>/dev/null | head -n 1 || true)"
+    fi
+fi
+
+if [[ -z "${QCONF}" || ! -f "${QCONF}" ]]; then
+    echo "[ERROR] Could not find queries.conf."
+    echo "[INFO] Usage: sudo $0 /path/to/queries.conf"
+    exit 1
+fi
+
+if [[ ! -r "${QCONF}" || ! -w "${QCONF}" ]]; then
+    echo "[ERROR] Need read/write access to ${QCONF}. Run with sudo."
+    exit 1
+fi
+
+if ! grep -qE "^\s*postauth_query\s*=" "${QCONF}"; then
+    echo "[ERROR] postauth_query was not found in ${QCONF}."
+    exit 1
+fi
+
+BACKUP="${QCONF}.bak.$(date +%F-%H%M%S)"
+cp "${QCONF}" "${BACKUP}"
+echo "[INFO] Backup created: ${BACKUP}"
+
+OLD_BLOCK="$(perl -0777 -ne 'if(/postauth_query\s*=\s*"(.*?)"/s){print $1}' "${QCONF}")"
+TS_FMT="%S"
+if [[ "${OLD_BLOCK}" == *"%L"* ]]; then
+    TS_FMT="%L"
+fi
+
+echo "[INFO] Using authdate format token: ${TS_FMT}"
+
+read -r -d '' REPLACEMENT <<'EOF' || true
+postauth_query = "INSERT INTO __POSTAUTH_TABLE__ \\
+        (username, pass, reply, authdate, nasipaddress, calledstationid, nasidentifier) \\
+        VALUES ( \\
+                '%{SQL-User-Name}', \\
+                '%{%{User-Password}:-%{Chap-Password}}', \\
+                '%{reply:Packet-Type}', \\
+        '__TS_FMT__', \\
+                '%{%{NAS-IP-Address}:-}', \\
+                '%{%{Called-Station-Id}:-}', \\
+                '%{%{NAS-Identifier}:-}')"
+EOF
+
+REPLACEMENT="${REPLACEMENT/__TS_FMT__/${TS_FMT}}"
+
+TMP_FILE="$(mktemp)"
+perl -0777 -pe "s#^\\s*postauth_query\\s*=\\s*\".*?\"#${REPLACEMENT}#sm" "${QCONF}" > "${TMP_FILE}"
+sed -i 's/__POSTAUTH_TABLE__/${postauth_table}/g' "${TMP_FILE}"
+
+if cmp -s "${QCONF}" "${TMP_FILE}"; then
+    rm -f "${TMP_FILE}"
+    echo "[WARN] No changes were made to ${QCONF}."
+    exit 0
+fi
+
+cat "${TMP_FILE}" > "${QCONF}"
+rm -f "${TMP_FILE}"
+
+echo "[INFO] postauth_query updated in ${QCONF}"
+echo "[INFO] Verify with: grep -n \"postauth_query\" -A 8 ${QCONF}"
+echo "[INFO] Next: freeradius -CX && systemctl restart freeradius"

@@ -154,6 +154,9 @@ CREATE TABLE IF NOT EXISTS radpostauth (
   username varchar(64) NOT NULL DEFAULT '',
   pass varchar(64) NOT NULL DEFAULT '',
   reply varchar(32) NOT NULL DEFAULT '',
+  nasipaddress varchar(45) DEFAULT NULL,
+  calledstationid varchar(64) DEFAULT NULL,
+  nasidentifier varchar(128) DEFAULT NULL,
   authdate timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   class varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY  (id)
