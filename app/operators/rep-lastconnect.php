@@ -133,22 +133,26 @@
         }
     }
 
+    // Build NAS shortname lookup: prefer direct nasipaddress join, then fallback chain
     $ap_parts = array();
+    
+    // Primary: Use joined nas.shortname if nasipaddress is available
+    if (in_array('nasipaddress', $postauth_columns)) {
+        $ap_parts[] = "COALESCE(n.shortname, NULLIF(pa.nasipaddress, ''))";
+    }
+    
+    // Secondary fallbacks (legacy data support)
     if (in_array('ap', $postauth_columns)) {
         $ap_parts[] = "NULLIF(pa.ap, '')";
     }
     if (in_array('nasidentifier', $postauth_columns)) {
         $ap_parts[] = "NULLIF(pa.nasidentifier, '')";
     }
-    if (in_array('nasipaddress', $postauth_columns)) {
-        $ap_parts[] = sprintf("(SELECT n.shortname FROM %s AS n WHERE n.nasname = pa.nasipaddress ORDER BY n.id DESC LIMIT 1)",
-                              $configValues['CONFIG_DB_TBL_RADNAS']);
-        $ap_parts[] = "NULLIF(pa.nasipaddress, '')";
-    }
     if (in_array('calledstationid', $postauth_columns)) {
         $ap_parts[] = "NULLIF(pa.calledstationid, '')";
     }
 
+    // Tertiary fallback: look for NAS by user's radacct history
     $ap_parts[] = sprintf("(SELECT n.shortname"
                         . " FROM %s AS ra"
                         . " LEFT JOIN %s AS n ON n.nasname = ra.nasipaddress"
@@ -156,46 +160,6 @@
                         . " ORDER BY ra.acctupdatetime DESC LIMIT 1)",
                         $configValues['CONFIG_DB_TBL_RADACCT'],
                         $configValues['CONFIG_DB_TBL_RADNAS'],
-                        $tableSetting['postauth']['user']);
-    $ap_parts[] = sprintf("(SELECT ra.nasipaddress"
-                        . " FROM %s AS ra"
-                        . " WHERE ra.username = pa.%s"
-                        . " ORDER BY ra.acctupdatetime DESC LIMIT 1)",
-                        $configValues['CONFIG_DB_TBL_RADACCT'],
-                        $tableSetting['postauth']['user']);
-    $ap_parts[] = sprintf("(SELECT n.shortname"
-                        . " FROM %s AS n"
-                        . " WHERE n.shortname LIKE CONCAT(SUBSTRING_INDEX(ui.firstname, ' ', 1), '%%')"
-                        . " ORDER BY n.id DESC LIMIT 1)",
-                        $configValues['CONFIG_DB_TBL_RADNAS']);
-    $ap_parts[] = sprintf("(SELECT n.nasname"
-                        . " FROM %s AS n"
-                        . " WHERE n.shortname LIKE CONCAT(SUBSTRING_INDEX(ui.firstname, ' ', 1), '%%')"
-                        . " ORDER BY n.id DESC LIMIT 1)",
-                        $configValues['CONFIG_DB_TBL_RADNAS']);
-    $ap_parts[] = sprintf("(SELECT n.shortname"
-                        . " FROM %s AS n"
-                        . " WHERE n.shortname LIKE CONCAT('%%', (SELECT UPPER(SUBSTRING(rr.value, LOCATE('cc', LOWER(rr.value)), 5))"
-                        . " FROM %s AS rr"
-                        . " WHERE rr.username = pa.%s"
-                        . " AND rr.attribute = 'Tunnel-Password'"
-                        . " AND LOCATE('cc', LOWER(rr.value)) > 0"
-                        . " ORDER BY rr.id DESC LIMIT 1), '%%')"
-                        . " ORDER BY n.id DESC LIMIT 1)",
-                        $configValues['CONFIG_DB_TBL_RADNAS'],
-                        $configValues['CONFIG_DB_TBL_RADREPLY'],
-                        $tableSetting['postauth']['user']);
-    $ap_parts[] = sprintf("(SELECT n.nasname"
-                        . " FROM %s AS n"
-                        . " WHERE n.shortname LIKE CONCAT('%%', (SELECT UPPER(SUBSTRING(rr.value, LOCATE('cc', LOWER(rr.value)), 5))"
-                        . " FROM %s AS rr"
-                        . " WHERE rr.username = pa.%s"
-                        . " AND rr.attribute = 'Tunnel-Password'"
-                        . " AND LOCATE('cc', LOWER(rr.value)) > 0"
-                        . " ORDER BY rr.id DESC LIMIT 1), '%%')"
-                        . " ORDER BY n.id DESC LIMIT 1)",
-                        $configValues['CONFIG_DB_TBL_RADNAS'],
-                        $configValues['CONFIG_DB_TBL_RADREPLY'],
                         $tableSetting['postauth']['user']);
 
     $ap_select = "COALESCE(" . implode(", ", $ap_parts) . ", '(n/a)') AS ap";
@@ -216,10 +180,16 @@
     }
 
     // setup php session variables for exporting
-    $_SESSION['reportTable'] = sprintf("%s AS pa LEFT JOIN %s AS ui ON pa.%s = ui.username",
+    // Join with nas table on nasipaddress if available for efficient shortname lookup
+    $nas_join = "";
+    if (in_array('nasipaddress', $postauth_columns)) {
+        $nas_join = sprintf(" LEFT JOIN %s AS n ON n.nasname = pa.nasipaddress", $configValues['CONFIG_DB_TBL_RADNAS']);
+    }
+    $_SESSION['reportTable'] = sprintf("%s AS pa LEFT JOIN %s AS ui ON pa.%s = ui.username%s",
                                        $configValues['CONFIG_DB_TBL_RADPOSTAUTH'],
                                        $configValues['CONFIG_DB_TBL_DALOUSERINFO'],
-                                       $tableSetting['postauth']['user']);
+                                       $tableSetting['postauth']['user'],
+                                       $nas_join);
     $_SESSION['reportQuery'] = " WHERE " . implode(" AND ", $sql_WHERE);
     $_SESSION['reportType'] = "reportsLastConnectionAttempts";
 
