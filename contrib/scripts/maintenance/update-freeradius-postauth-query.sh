@@ -22,8 +22,13 @@ if [[ ! -r "${QCONF}" || ! -w "${QCONF}" ]]; then
     exit 1
 fi
 
-if ! grep -qE "^\s*postauth_query\s*=" "${QCONF}"; then
-    echo "[ERROR] postauth_query was not found in ${QCONF}."
+MODE=""
+if grep -qE "^\s*postauth_query\s*=" "${QCONF}"; then
+    MODE="legacy"
+elif grep -qE "post-auth\s*\{" "${QCONF}"; then
+    MODE="block"
+else
+    echo "[ERROR] Could not find either postauth_query= or post-auth { ... query = ... } in ${QCONF}."
     exit 1
 fi
 
@@ -31,32 +36,36 @@ BACKUP="${QCONF}.bak.$(date +%F-%H%M%S)"
 cp "${QCONF}" "${BACKUP}"
 echo "[INFO] Backup created: ${BACKUP}"
 
-OLD_BLOCK="$(perl -0777 -ne 'if(/postauth_query\s*=\s*"(.*?)"/s){print $1}' "${QCONF}")"
+if [[ "${MODE}" == "legacy" ]]; then
+    OLD_BLOCK="$(perl -0777 -ne 'if(/postauth_query\s*=\s*"(.*?)"/s){print $1}' "${QCONF}")"
+else
+    OLD_BLOCK="$(perl -0777 -ne 'if(/post-auth\s*\{.*?\bquery\s*=\s*"(.*?)"/s){print $1}' "${QCONF}")"
+fi
+
 TS_FMT="%S"
-if [[ "${OLD_BLOCK}" == *"%L"* ]]; then
+if [[ "${OLD_BLOCK}" == *"%S.%M"* ]]; then
+    TS_FMT="%S.%M"
+elif [[ "${OLD_BLOCK}" == *"%L"* ]]; then
     TS_FMT="%L"
 fi
 
 echo "[INFO] Using authdate format token: ${TS_FMT}"
 
-read -r -d '' REPLACEMENT <<'EOF' || true
-postauth_query = "INSERT INTO __POSTAUTH_TABLE__ \\
-        (username, pass, reply, authdate, nasipaddress, calledstationid, nasidentifier) \\
-        VALUES ( \\
-                '%{SQL-User-Name}', \\
-                '%{%{User-Password}:-%{Chap-Password}}', \\
-                '%{reply:Packet-Type}', \\
-        '__TS_FMT__', \\
-                '%{%{NAS-IP-Address}:-}', \\
-                '%{%{Called-Station-Id}:-}', \\
-                '%{%{NAS-Identifier}:-}')"
+read -r -d '' LEGACY_REPLACEMENT <<EOF || true
+postauth_query = "INSERT INTO __POSTAUTH_TABLE__ (username, pass, reply, authdate, nasipaddress, calledstationid, nasidentifier) VALUES ('%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', '${TS_FMT}', '%{%{NAS-IP-Address}:-}', '%{%{Called-Station-Id}:-}', '%{%{NAS-Identifier}:-}')"
 EOF
 
-REPLACEMENT="${REPLACEMENT/__TS_FMT__/${TS_FMT}}"
+read -r -d '' BLOCK_QUERY <<EOF || true
+INSERT INTO radpostauth (username, pass, reply, authdate, nasipaddress, calledstationid, nasidentifier ) VALUES ( '%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', '${TS_FMT}', '%{%{NAS-IP-Address}:-}', '%{%{Called-Station-Id}:-}', '%{%{NAS-Identifier}:-}' )
+EOF
 
 TMP_FILE="$(mktemp)"
-perl -0777 -pe "s#^\\s*postauth_query\\s*=\\s*\".*?\"#${REPLACEMENT}#sm" "${QCONF}" > "${TMP_FILE}"
-sed -i 's/__POSTAUTH_TABLE__/${postauth_table}/g' "${TMP_FILE}"
+if [[ "${MODE}" == "legacy" ]]; then
+    perl -0777 -pe "s#^\\s*postauth_query\\s*=\\s*\".*?\"#${LEGACY_REPLACEMENT}#sm" "${QCONF}" > "${TMP_FILE}"
+    sed -i 's/__POSTAUTH_TABLE__/${postauth_table}/g' "${TMP_FILE}"
+else
+    NEW_QUERY="${BLOCK_QUERY}" perl -0777 -pe 'BEGIN { $new = $ENV{"NEW_QUERY"}; } s#(post-auth\s*\{.*?\bquery\s*=\s*")(?:(?:\\.|[^\"])*)("\s*)#$1$new$2#s' "${QCONF}" > "${TMP_FILE}"
+fi
 
 if cmp -s "${QCONF}" "${TMP_FILE}"; then
     rm -f "${TMP_FILE}"
@@ -67,6 +76,11 @@ fi
 cat "${TMP_FILE}" > "${QCONF}"
 rm -f "${TMP_FILE}"
 
-echo "[INFO] postauth_query updated in ${QCONF}"
-echo "[INFO] Verify with: grep -n \"postauth_query\" -A 8 ${QCONF}"
+if [[ "${MODE}" == "legacy" ]]; then
+    echo "[INFO] postauth_query updated in ${QCONF}"
+    echo "[INFO] Verify with: grep -n \"postauth_query\" -A 8 ${QCONF}"
+else
+    echo "[INFO] post-auth query updated in ${QCONF}"
+    echo "[INFO] Verify with: grep -n \"post-auth\" -A 12 ${QCONF}"
+fi
 echo "[INFO] Next: freeradius -CX && systemctl restart freeradius"

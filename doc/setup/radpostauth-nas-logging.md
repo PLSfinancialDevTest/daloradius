@@ -54,8 +54,8 @@ The script:
 
 - auto-detects `queries.conf` when possible
 - creates a timestamped backup (`queries.conf.bak.YYYY-MM-DD-HHMMSS`)
-- updates only `postauth_query`
-- preserves the existing auth timestamp token style (`%S` or `%L`)
+- updates either `postauth_query = ...` or `post-auth { query = ... }` (depending on your FreeRADIUS config style)
+- preserves the existing auth timestamp token style (`%S`, `%S.%M`, or `%L`)
 
 Typical location (FreeRADIUS 3.x):
 
