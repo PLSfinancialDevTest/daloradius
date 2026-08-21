@@ -260,21 +260,27 @@ switch ($reportType) {
             
             // Primary: Use joined nas.shortname if nasipaddress is available
             if (in_array('nasipaddress', $postauth_columns)) {
-                $ap_parts[] = "COALESCE(n.shortname, NULLIF(pa.nasipaddress, ''))";
+                $ap_parts[] = "n.shortname";
             }
             
-            // Secondary fallbacks (legacy data support)
+            // Secondary: If nas shortname not found, show nasipaddress - calledstationid
+            if (in_array('nasipaddress', $postauth_columns) && in_array('calledstationid', $postauth_columns)) {
+                $ap_parts[] = "CONCAT(COALESCE(NULLIF(pa.nasipaddress, ''), '?'), ' - ', COALESCE(NULLIF(pa.calledstationid, ''), '?'))";
+            } elseif (in_array('nasipaddress', $postauth_columns)) {
+                $ap_parts[] = "NULLIF(pa.nasipaddress, '')";
+            } elseif (in_array('calledstationid', $postauth_columns)) {
+                $ap_parts[] = "NULLIF(pa.calledstationid, '')";
+            }
+            
+            // Tertiary fallbacks (legacy data support)
             if (in_array('ap', $postauth_columns)) {
                 $ap_parts[] = "NULLIF(pa.ap, '')";
             }
             if (in_array('nasidentifier', $postauth_columns)) {
                 $ap_parts[] = "NULLIF(pa.nasidentifier, '')";
             }
-            if (in_array('calledstationid', $postauth_columns)) {
-                $ap_parts[] = "NULLIF(pa.calledstationid, '')";
-            }
 
-            // Tertiary fallback: look for NAS by user's radacct history
+            // Quaternary fallback: look for NAS by user's radacct history
             $ap_parts[] = sprintf("(SELECT n.shortname"
                                 . " FROM %s AS ra"
                                 . " LEFT JOIN %s AS n ON n.nasname = ra.nasipaddress"
