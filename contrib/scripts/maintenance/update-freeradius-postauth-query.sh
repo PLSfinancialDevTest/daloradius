@@ -55,16 +55,37 @@ read -r -d '' LEGACY_REPLACEMENT <<EOF || true
 postauth_query = "INSERT INTO __POSTAUTH_TABLE__ (username, pass, reply, authdate, nasipaddress, calledstationid, nasidentifier) VALUES ('%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', '${TS_FMT}', '%{%{NAS-IP-Address}:-}', '%{%{Called-Station-Id}:-}', '%{%{NAS-Identifier}:-}')"
 EOF
 
-read -r -d '' BLOCK_QUERY <<EOF || true
-INSERT INTO radpostauth (username, pass, reply, authdate, nasipaddress, calledstationid, nasidentifier ) VALUES ( '%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', '${TS_FMT}', '%{%{NAS-IP-Address}:-}', '%{%{Called-Station-Id}:-}', '%{%{NAS-Identifier}:-}' )
+read -r -d '' BLOCK_QUERY <<'EOF' || true
+INSERT INTO __POSTAUTH_TABLE_DOT__ \\
+            (username, pass, reply, authdate, nasipaddress, calledstationid, nasidentifier __CLASS_COL__) \\
+        VALUES ( \\
+            '%{SQL-User-Name}', \\
+            '%{%{User-Password}:-%{Chap-Password}}', \\
+            '%{reply:Packet-Type}', \\
+            '__TS_FMT__', \\
+            '%{%{NAS-IP-Address}:-}', \\
+            '%{%{Called-Station-Id}:-}', \\
+            '%{%{NAS-Identifier}:-}' \\
+            __CLASS_REPLY__)
 EOF
+
+BLOCK_QUERY="${BLOCK_QUERY/__TS_FMT__/${TS_FMT}}"
+BLOCK_QUERY="${BLOCK_QUERY/__POSTAUTH_TABLE_DOT__/\$\{..postauth_table\}}"
+BLOCK_QUERY="${BLOCK_QUERY/__CLASS_COL__/\$\{..class.column_name\}}"
+BLOCK_QUERY="${BLOCK_QUERY/__CLASS_REPLY__/\$\{..class.reply_xlat\}}"
 
 TMP_FILE="$(mktemp)"
 if [[ "${MODE}" == "legacy" ]]; then
     perl -0777 -pe "s#^\\s*postauth_query\\s*=\\s*\".*?\"#${LEGACY_REPLACEMENT}#sm" "${QCONF}" > "${TMP_FILE}"
     sed -i 's/__POSTAUTH_TABLE__/${postauth_table}/g' "${TMP_FILE}"
 else
-    NEW_QUERY="${BLOCK_QUERY}" perl -0777 -pe 'BEGIN { $new = $ENV{"NEW_QUERY"}; } s#(post-auth\s*\{.*?\bquery\s*=\s*")(?:(?:\\.|[^\"])*)("\s*)#$1$new$2#s' "${QCONF}" > "${TMP_FILE}"
+    NEW_QUERY="${BLOCK_QUERY}" perl -0777 -pe 'BEGIN { $new = $ENV{"NEW_QUERY"}; }
+        if (s#(Authentication Logging Queries.*?post-auth\s*\{.*?\bquery\s*=\s*")(?:(?:\\.|[^\"])*)("\s*)#$1$new$2#s) {
+            $_;
+        } else {
+            s#(post-auth\s*\{.*?\bquery\s*=\s*")(?:(?:\\.|[^\"])*)("\s*)#$1$new$2#s;
+        }
+    ' "${QCONF}" > "${TMP_FILE}"
 fi
 
 if cmp -s "${QCONF}" "${TMP_FILE}"; then
