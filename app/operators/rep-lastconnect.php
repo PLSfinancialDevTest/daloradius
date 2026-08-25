@@ -46,16 +46,18 @@
         break;
     }
 
-    // in other cases we just check that syntax is ok
-    $startdate = (array_key_exists('startdate', $_GET) && isset($_GET['startdate']) &&
-                  preg_match(DATE_REGEX, $_GET['startdate'], $m) === 1 &&
-                  checkdate($m[2], $m[3], $m[1]))
-               ? $_GET['startdate'] : date("Y-m-01");
+     // in other cases we just check that syntax is ok
+     $startdate_is_user_supplied = (array_key_exists('startdate', $_GET) && isset($_GET['startdate']) &&
+                                              preg_match(DATE_REGEX, $_GET['startdate'], $m) === 1 &&
+                                              checkdate($m[2], $m[3], $m[1]));
+     $startdate = $startdate_is_user_supplied
+                    ? $_GET['startdate'] : date("Y-m-01");
 
-    $enddate = (array_key_exists('enddate', $_GET) && isset($_GET['enddate']) &&
-                preg_match(DATE_REGEX, $_GET['enddate'], $m) === 1 &&
-                checkdate($m[2], $m[3], $m[1]))
-             ? $_GET['enddate'] : date("Y-m-01", mktime(0, 0, 0, date('n') + 1, 1, date('Y')));
+     $enddate_is_user_supplied = (array_key_exists('enddate', $_GET) && isset($_GET['enddate']) &&
+                                            preg_match(DATE_REGEX, $_GET['enddate'], $m) === 1 &&
+                                            checkdate($m[2], $m[3], $m[1]));
+     $enddate = $enddate_is_user_supplied
+                 ? $_GET['enddate'] : date("Y-m-01", mktime(0, 0, 0, date('n') + 1, 1, date('Y')));
 
     $radiusReply = (array_key_exists('radiusReply', $_GET) && !empty(trim($_GET['radiusReply'])) &&
                     in_array(trim($_GET['radiusReply']), $valid_radiusReplys))
@@ -178,9 +180,17 @@
         $sql_WHERE[] = sprintf("pa.%s LIKE '%%%s%%'", $tableSetting['postauth']['user'],
                                                     $dbSocket->escapeSimple($username));
     }
-    $sql_WHERE[] = sprintf("pa.%s BETWEEN '%s' AND '%s'", $tableSetting['postauth']['date'],
-                                                          $dbSocket->escapeSimple($startdate),
-                                                          $dbSocket->escapeSimple($enddate));
+    $sql_WHERE[] = sprintf("pa.%s >= '%s'", $tableSetting['postauth']['date'],
+                                            $dbSocket->escapeSimple($startdate . " 00:00:00"));
+    if ($enddate_is_user_supplied) {
+        // When user picks an end date, include the entire day.
+        $sql_WHERE[] = sprintf("pa.%s < DATE_ADD('%s', INTERVAL 1 DAY)", $tableSetting['postauth']['date'],
+                                                                  $dbSocket->escapeSimple($enddate));
+    } else {
+        // Default end date is already the first day of next month, so keep it exclusive.
+        $sql_WHERE[] = sprintf("pa.%s < '%s'", $tableSetting['postauth']['date'],
+                                                $dbSocket->escapeSimple($enddate));
+    }
     if ($radiusReply != "Any") {
         $sql_WHERE[] = sprintf("pa.reply='%s'", $dbSocket->escapeSimple($radiusReply));
     }
