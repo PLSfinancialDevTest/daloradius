@@ -73,6 +73,7 @@ function hashPasswordAttribute($attribute, $value) {
         //~ case "CHAP-Password":
         case "User-Password":
         case "Cleartext-Password":
+        case "Tunnel-Password":
             return $value;
     }
 }
