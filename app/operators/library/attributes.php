@@ -31,7 +31,8 @@ function is_group($user_or_group) {
 }
 
 function is_passwordlike_attribute($attribute) {
-    return preg_match("/-Password$/", $attribute) === 1;
+    // strip an optional RFC2868 tag suffix (e.g. "Tunnel-Password:1") before matching
+    return preg_match("/-Password(:\d+)?$/", $attribute) === 1;
 }
 
 /**
@@ -48,6 +49,9 @@ function hashPasswordAttribute($attribute, $value) {
     if (!is_passwordlike_attribute($attribute)) {
         return false;
     }
+
+    // strip an optional RFC2868 tag suffix (e.g. "Tunnel-Password:1") before matching
+    $attribute = preg_replace("/:\d+$/", "", $attribute);
 
     switch ($attribute) {
         case "Crypt-Password":

@@ -104,7 +104,6 @@
                                       ? '1' : '0';
 
             // Reply attributes (e.g., Tunnel-Password)
-            $enableTunnelPassword = (array_key_exists('enableTunnelPassword', $_POST) && $_POST['enableTunnelPassword'] === '1') ? '1' : '0';
             $tunnelPassword = (array_key_exists('tunnelPassword', $_POST) && !empty(trim($_POST['tunnelPassword']))) ? trim($_POST['tunnelPassword']) : "";
 
             // billing info variables
@@ -181,9 +180,10 @@
                         $reply_attribute_list[] = "Framed-IP-Address";
                     }
 
-                    if ($enableTunnelPassword === '1' && !empty($tunnelPassword)) {
-                        $injected_attribute['Tunnel-Password'] = $tunnelPassword;
-                        $reply_attribute_list[] = "Tunnel-Password";
+                    if (!empty($tunnelPassword)) {
+                        // tag with :1 (RFC2868 has_tag attribute) so tag-aware NAS devices accept the value
+                        $injected_attribute['Tunnel-Password:1'] = $tunnelPassword;
+                        $reply_attribute_list[] = "Tunnel-Password:1";
                     }
 
                      $i = 0;
@@ -203,7 +203,7 @@
                                        "sessiontimeout", "idletimeout", "simultaneoususe", "framedipaddress",
                                        "firstname", "lastname", "email", "department", "company", "workphone", "homephone",
                                        "mobilephone", "address", "city", "state", "country", "zip", "notes", "changeuserinfo",
-                                       "enableUserPortalLogin", "portalLoginPassword", "enableTunnelPassword", "tunnelPassword", "bi_contactperson", "bi_company",
+                                       "enableUserPortalLogin", "portalLoginPassword", "tunnelPassword", "bi_contactperson", "bi_company",
                                        "bi_email", "bi_phone", "bi_address", "bi_city", "bi_state", "bi_country", "bi_zip",
                                        "bi_paymentmethod", "bi_cash", "bi_creditcardname", "bi_creditcardnumber",
                                        "bi_creditcardverification", "bi_creditcardtype", "bi_creditcardexp", "bi_notes",
@@ -433,15 +433,6 @@
                                     "type" => "date",
                                     "min" => date('Y-m-d', strtotime('+1 day')), // tomorrow
                                 );
-
-    $input_descriptors1[] = array(
-                                    "type" => "checkbox",
-                                    "name" => "enableTunnelPassword",
-                                    "caption" => "Enable Tunnel-Password (Reply Attribute)",
-                                    "value" => "1",
-                                    "checked" => ((isset($failureMsg) && $enableTunnelPassword === '1') ? true : false),
-                                    "tooltipText" => "Enable to configure Tunnel-Password as a RADIUS reply attribute for tunneled authentication"
-                                 );
 
     $input_descriptors1[] = array(
                                     "name" => "tunnelPassword",

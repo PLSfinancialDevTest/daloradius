@@ -69,6 +69,10 @@
               ? str_replace("%", "", trim($_GET['username'])) : "";
     $username_enc = (!empty($username)) ? htmlspecialchars($username, ENT_QUOTES, 'UTF-8') : "";
 
+    $name = (array_key_exists('name', $_GET) && !empty(str_replace("%", "", trim($_GET['name']))))
+           ? str_replace("%", "", trim($_GET['name'])) : "";
+    $name_enc = (!empty($name)) ? htmlspecialchars($name, ENT_QUOTES, 'UTF-8') : "";
+
     // the array $cols has multiple purposes:
     // - its keys (when non-numerical) can be used
     //   - for validating user input
@@ -180,6 +184,10 @@
         $sql_WHERE[] = sprintf("pa.%s LIKE '%%%s%%'", $tableSetting['postauth']['user'],
                                                     $dbSocket->escapeSimple($username));
     }
+    if (!empty($name)) {
+        $sql_WHERE[] = sprintf("CONCAT(COALESCE(ui.firstname, ''), ' ', COALESCE(ui.lastname, '')) LIKE '%%%s%%'",
+                                                    $dbSocket->escapeSimple($name));
+    }
     $sql_WHERE[] = sprintf("pa.%s >= '%s'", $tableSetting['postauth']['date'],
                                             $dbSocket->escapeSimple($startdate . " 00:00:00"));
     if ($enddate_is_user_supplied) {
@@ -248,6 +256,9 @@
         }
         if (!empty($username_enc)) {
             $partial_query_params[] = sprintf("username=%s", urlencode($username_enc));
+        }
+        if (!empty($name_enc)) {
+            $partial_query_params[] = sprintf("name=%s", urlencode($name_enc));
         }
         if (!empty($radiusReply)) {
             $partial_query_params[] = sprintf("radiusReply=%s", $radiusReply);

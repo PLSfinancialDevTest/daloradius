@@ -466,7 +466,7 @@ $l['FormField']['mngradnasnew.php']['Tooltip']['NasShortname'] = "(nume descript
 $l['FormField']['mngradusergroupdel.php']['Tooltip']['Groupname'] = "Dac? specifica?i grup atunci numai unic de ?nregistrare care se potrive?te at?t de nume de utilizator ?i de grup pe care a?i specificat vor fi eliminate . Dac? omite?i grupului apoi toate ?nregistr?rile pentru c? special vor fi eliminate de utilizator! ";
 
 
-$l['Tooltip']['usernameTooltip'] = "exact ca numele de utilizator a utilizatorului <br/>"
+$l['Tooltip']['usernameTooltip'] = "Enter a username or part of it for partial name search <br/>"
                                  . "Se va folosi pentru a se conecta la sistem";
 $l['Tooltip']['passwordTypeTooltip'] = "The password type used to authenticate the user in Radius.";
 $l['Tooltip']['passwordTooltip'] = "Parolele sunt sensetive ?n <br/>"

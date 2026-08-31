@@ -281,7 +281,7 @@
 
                     if (user_exists($dbSocket, $subject)) {
                         if (!empty($tunnelPassword) &&
-                            upsert_single_attribute($dbSocket, $subject, 'Tunnel-Password', '=', $tunnelPassword,
+                            upsert_single_attribute($dbSocket, $subject, 'Tunnel-Password:1', '=', $tunnelPassword,
                                                     $configValues['CONFIG_DB_TBL_RADREPLY'])) {
                             $updatedTunnelPasswords++;
                         }
@@ -327,7 +327,7 @@
                     }
 
                     if (!empty($tunnelPassword)) {
-                        upsert_single_attribute($dbSocket, $subject, 'Tunnel-Password', '=', $tunnelPassword,
+                        upsert_single_attribute($dbSocket, $subject, 'Tunnel-Password:1', '=', $tunnelPassword,
                                                 $configValues['CONFIG_DB_TBL_RADREPLY']);
                     }
 

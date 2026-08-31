@@ -299,7 +299,7 @@ $l['FormField']['mngradnasnew.php']['ToolTip']['NasShortname'] = "(nome decritti
 $l['FormField']['mngradusergroupdel.php']['ToolTip']['Groupname'] = "Se specifichi un gruppo allora solo il singolo record che corrisponde contemporaneamente all'username e al grupppo verrà rimosso.Se ometti il ggruppo allora tutti i record di questo utente verranno rimossi.!";
 
 
-$l['Tooltip']['usernameTooltip'] = "Il nome utente esatto<br/>&nbsp;&nbsp;&nbsp;
+$l['Tooltip']['usernameTooltip'] = "Inserire il nome utente o parte di esso per la ricerca con corrispondenza parziale<br/>&nbsp;&nbsp;&nbsp;
                     così come l'utente userà connettersi al sistema";
 $l['Tooltip']['passwordTypeTooltip'] = "The password type used to authenticate the user in Radius.";
 $l['Tooltip']['passwordTooltip'] = "Le password sono sensibili alle maiuscole<br/>&nbsp;&nbsp;&nbsp;

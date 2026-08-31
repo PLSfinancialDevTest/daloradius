@@ -132,7 +132,7 @@
         foreach ($arr as $field_name) {
             $nested_condition2[] = sprintf("ui.%s LIKE '%%%s%%'", $field_name, $value_prefix);
         }
-        $nested_condition2[] = sprintf("rr.%s LIKE '%%%s'", "value", $value_prefix);
+        $nested_condition2[] = sprintf("rr.%s LIKE '%%%s%%'", "value", $value_prefix);
     }
 
     // init SQL WHERE (with join condition already set)

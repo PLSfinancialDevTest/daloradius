@@ -73,7 +73,6 @@
             $groups = (array_key_exists('groups', $_POST) && isset($_POST['groups'])) ? $_POST['groups'] : array();
 
             // Reply attributes (e.g., Tunnel-Password)
-            $enableTunnelPassword = (array_key_exists('enableTunnelPassword', $_POST) && $_POST['enableTunnelPassword'] === '1') ? '1' : '0';
             $tunnelPassword = (array_key_exists('tunnelPassword', $_POST) && !empty(trim($_POST['tunnelPassword']))) ? trim($_POST['tunnelPassword']) : "";
 
             // user info variables
@@ -225,8 +224,9 @@
                     $_POST['injected_attribute'] = array( $attribute, $value, ':=', 'check' );
 
                     // Handle Reply Attributes: inject Tunnel-Password if enabled
-                    if ($enableTunnelPassword === '1' && !empty($tunnelPassword)) {
-                        $_POST['injected_reply_attribute'] = array( 'Tunnel-Password', $tunnelPassword, '=', 'reply' );
+                    if (!empty($tunnelPassword)) {
+                        // tag with :1 (RFC2868 has_tag attribute) so tag-aware NAS devices accept the value
+                        $_POST['injected_reply_attribute'] = array( 'Tunnel-Password:1', $tunnelPassword, '=', 'reply' );
                     }
 
                     include("library/attributes.php");
@@ -240,7 +240,7 @@
                                        "bi_creditcardexp", "bi_notes", "bi_lead", "bi_coupon", "bi_ordertaker", "bi_billstatus",
                                        "bi_lastbill", "bi_nextbill", "bi_nextinvoicedue", "bi_billdue", "bi_postalinvoice", "bi_faxinvoice",
                                        "bi_emailinvoice", "bi_changeuserbillinfo", "changeUserInfo", "copycontact", "portalLoginPassword",
-                                       "enableUserPortalLogin", "enableTunnelPassword", "tunnelPassword", "csrf_token", "submit"
+                                       "enableUserPortalLogin", "tunnelPassword", "csrf_token", "submit"
                                      );
 
                     $attributesCount = handleAttributes($dbSocket, $u, $skipList);
@@ -425,15 +425,6 @@
                                         "type" => "select",
                                         "selected_value" => ((isset($failureMsg)) ? $passwordType : "")
                                     );
-
-        $input_descriptors1[] = array(
-                                        "type" => "checkbox",
-                                        "name" => "enableTunnelPassword",
-                                        "caption" => "Enable Tunnel-Password (Reply Attribute)",
-                                        "value" => "1",
-                                        "checked" => ((isset($failureMsg) && $enableTunnelPassword === '1') ? true : false),
-                                        "tooltipText" => "Enable to configure Tunnel-Password as a RADIUS reply attribute for tunneled authentication"
-                                     );
 
         $input_descriptors1[] = array(
                                        "name" => "tunnelPassword",

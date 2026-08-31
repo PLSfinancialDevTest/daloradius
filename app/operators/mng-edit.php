@@ -241,6 +241,12 @@
                                ? trim($_POST['reply_attribute_op']) : "=";
                 $reply_attr_value = (isset($_POST['reply_attribute_value']) && !empty(trim($_POST['reply_attribute_value']))) ? trim($_POST['reply_attribute_value']) : "";
 
+                // RFC2868 tunnel attributes are "has_tag": tag 0 (no tag suffix) is
+                // treated as untagged by many NAS devices, so default to tag 1
+                if (preg_match('/^Tunnel-(Password|Type|Medium-Type|Private-Group-Id|Client-Endpoint|Server-Endpoint|Preference|Client-Auth-Id|Server-Auth-Id|Assignment-Id)$/', $reply_attr_name)) {
+                    $reply_attr_name .= ':1';
+                }
+
                 if (!empty($reply_attr_name) && !empty($reply_attr_value)) {
                     $checkSql = sprintf("SELECT COUNT(*) AS cnt FROM %s WHERE username='%s' AND attribute='%s'",
                                        $configValues['CONFIG_DB_TBL_RADREPLY'],
@@ -795,7 +801,7 @@ EOF;
                 $id = $row[5];
                 $id__attribute = sprintf('%s__%s', $id, $row[0]);
                 $name = sprintf('editValues%s[]', $id);
-                $type = (preg_match("/-Password$/", $row[0])) ? "password" : "text";
+                $type = (preg_match("/-Password(:\\d+)?$/i", $row[0])) ? "password" : "text";
                 $onclick = sprintf("document.getElementById('form-%d-radcheck').submit()", $id);
 
                 $descriptor = array( 'onclick' => $onclick, 'attribute' => $row[0], 'select_name' => $name, 'selected_option' => $row[1],
@@ -847,7 +853,7 @@ EOF;
                 $id = $row[5];
                 $id__attribute = sprintf('%s__%s', $id, $row[0]);
                 $name = sprintf('editValues%s[]', $id);
-                $type = (preg_match("/-Password$/", $row[0])) ? "password" : "text";
+                $type = (preg_match("/-Password(:\\d+)?$/i", $row[0])) ? "password" : "text";
                 $onclick = sprintf("document.getElementById('form-%d-radreply').submit()", $id);
 
                 $descriptor = array( 'onclick' => $onclick, 'attribute' => $row[0], 'select_name' => $name, 'selected_option' => $row[1],

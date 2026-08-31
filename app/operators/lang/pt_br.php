@@ -445,7 +445,7 @@ $l['FormField']['mngradnasnew.php']['ToolTip']['NasShortname'] = "(Descrição d
 
 $l['FormField']['mngradusergroupdel.php']['ToolTip']['Groupname'] = "Se você especificar grupo, apenas o registro único que corresponder ao nome de usuário e ao grupo que você especificou será removido. Se você omitir o grupo, todos os registros para esse usuário específico serão removidos!";
 
-$l['Tooltip']['usernameTooltip'] = "O nome exato do usuario <br/>&nbsp;&nbsp;&nbsp;
+$l['Tooltip']['usernameTooltip'] = "Insira um nome de usuário ou parte dele para pesquisa de correspondência parcial <br/>&nbsp;&nbsp;&nbsp;
                     para se conectar no sistema";
 $l['Tooltip']['passwordTypeTooltip'] = "O password digitado corresponde ao usuario do radius";
 $l['Tooltip']['passwordTooltip'] = "O password  é case sensitive<br/>&nbsp;&nbsp;&nbsp;

@@ -103,6 +103,16 @@ $components[] = $username_input;
 
 $components[] = array(
                             "id" => 'random',
+                            "name" => "name",
+                            "type" => "text",
+                            "value" => ((isset($name)) ? $name : ""),
+                            "tooltipText" => t('Tooltip','FullName'),
+                            "caption" => t('all','Name'),
+                            "sidebar" => true,
+                       );
+
+$components[] = array(
+                            "id" => 'random',
                             "caption" => "RADIUS Reply",
                             "name" => "radiusReply",
                             "type" => "select",

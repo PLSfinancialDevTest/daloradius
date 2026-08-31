@@ -451,7 +451,7 @@ $l['FormField']['mngradnasnew.php']['ToolTip']['NasShortname'] = "(descriptive n
 $l['FormField']['mngradusergroupdel.php']['ToolTip']['Groupname'] = "If you specify group then only the single record that matches both the username and the group which you have specified will be removed. If you omit the group then all records for that particular user will be removed!";
 
 
-$l['Tooltip']['usernameTooltip'] = "The exact username as the user<br/>&nbsp;&nbsp;&nbsp;
+$l['Tooltip']['usernameTooltip'] = "Enter a username or part of it for partial name search.<br/>&nbsp;&nbsp;&nbsp;
                     will use to connect to the system";
 $l['Tooltip']['passwordTypeTooltip'] = "The password type used to authenticate the user in Radius.";
 $l['Tooltip']['passwordTooltip'] = "Passwords are case sensetive in<br/>&nbsp;&nbsp;&nbsp;
